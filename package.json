@@ -13,12 +13,13 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:print": "npm run dev --workspace=print-service",
     "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "start": "npm run dev --workspace=backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
   },
-  "dependencies": {
-    "ioredis": "^5.4.1"
+  "overrides": {
+    "ioredis": "5.4.1"
   }
 }
