@@ -1,0 +1,117 @@
+{
+  "name": "WhatsApp Bot - Cardápio Principal",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-message",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Receber Mensagem",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrair dados da mensagem Evolution API\nconst body = $input.first().json.body || $input.first().json;\n\nconst instance = body.instance || body.sender?.instanceId || '';\nconst phone = (body.data?.key?.remoteJid || '').replace('@s.whatsapp.net', '');\nconst message = (\n  body.data?.message?.conversation ||\n  body.data?.message?.extendedTextMessage?.text ||\n  body.data?.message?.imageMessage?.caption ||\n  ''\n).trim();\n\nconst isFromMe = body.data?.key?.fromMe || false;\nconst messageType = body.data?.messageType || 'text';\n\n// Ignorar mensagens enviadas pelo bot\nif (isFromMe || !phone || !message) {\n  return [{ json: { skip: true } }];\n}\n\nreturn [{\n  json: {\n    instance,\n    phone,\n    message,\n    messageType,\n    timestamp: new Date().toISOString(),\n  }\n}];"
+      },
+      "id": "extract-message",
+      "name": "Extrair Dados da Mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.skip }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-skip",
+      "name": "Ignorar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BACKEND_URL }}/api/v1/webhooks/whatsapp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "instance",
+              "value": "={{ $json.instance }}"
+            },
+            {
+              "name": "data",
+              "value": "={{ $input.first().json.body?.data || {} }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-to-backend",
+      "name": "Enviar ao Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"ok\" }"
+      },
+      "id": "respond-ok",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Receber Mensagem": {
+      "main": [
+        [{ "node": "Extrair Dados da Mensagem", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extrair Dados da Mensagem": {
+      "main": [
+        [{ "node": "Ignorar?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ignorar?": {
+      "main": [
+        [],
+        [{ "node": "Enviar ao Backend", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enviar ao Backend": {
+      "main": [
+        [{ "node": "Responder OK", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "name": "WhatsApp - Handoff Humano",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "human-takeover-event",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook - Evento Handoff",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.event }}",
+              "operation": "equals",
+              "value2": "human_takeover_requested"
+            }
+          ]
+        }
+      },
+      "id": "check-event",
+      "name": "É handoff?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar notificações para operadores\nconst data = $json.data;\n\n// Mensagem para o grupo de operadores\nconst notif = `🔔 *Novo atendimento solicitado*\\n\\n` +\n  `📱 Cliente: ${data.telefone}\\n` +\n  `💬 Mensagem: \"${data.mensagem}\"\\n` +\n  `🏪 Loja ID: ${data.loja_id}\\n\\n` +\n  `Acesse o painel para atender.`;\n\nreturn [{\n  json: {\n    notification: notif,\n    loja_id: data.loja_id,\n    telefone: data.telefone,\n    mensagem: data.mensagem,\n  }\n}];"
+      },
+      "id": "format-notification",
+      "name": "Formatar Notificação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true, \"message\": \"Handoff registrado\" }"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Evento Handoff": {
+      "main": [
+        [{ "node": "É handoff?", "type": "main", "index": 0 }]
+      ]
+    },
+    "É handoff?": {
+      "main": [
+        [{ "node": "Formatar Notificação", "type": "main", "index": 0 }],
+        [{ "node": "Responder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatar Notificação": {
+      "main": [
+        [{ "node": "Responder", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

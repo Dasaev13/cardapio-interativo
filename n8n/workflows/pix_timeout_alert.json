@@ -1,0 +1,122 @@
+{
+  "name": "Pix Expirado - Alerta WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pix-event",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook - Evento Pix",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.event }}",
+              "operation": "equals",
+              "value2": "pix_expired"
+            }
+          ]
+        }
+      },
+      "id": "check-event",
+      "name": "É pix_expired?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.data;\n\nconst mensagem = `⏰ *Seu Pix expirou!*\\n\\n` +\n  `O pagamento do seu pedido expirou sem confirmação.\\n\\n` +\n  `Deseja refazer o pagamento? Acesse novamente o link do cardápio.\\n\\n` +\n  `Para falar com um atendente, envie *atendente*`;\n\nreturn [{\n  json: {\n    phone: data.telefone,\n    loja_id: data.loja_id,\n    pedido_id: data.pedido_id,\n    message: mensagem,\n  }\n}];"
+      },
+      "id": "format-message",
+      "name": "Formatar Mensagem Pix Expirado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BACKEND_URL }}/api/v1/admin/loja",
+        "options": {}
+      },
+      "id": "get-instance",
+      "name": "Buscar Instância",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $json.data?.whatsapp_instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Formatar Mensagem Pix Expirado').item.json.phone }}\",\n  \"options\": { \"delay\": 500 },\n  \"textMessage\": { \"text\": \"{{ $('Formatar Mensagem Pix Expirado').item.json.message }}\" }\n}",
+        "options": {}
+      },
+      "id": "send-whatsapp",
+      "name": "Enviar Alerta WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1080, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true }"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1280, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Evento Pix": {
+      "main": [
+        [{ "node": "É pix_expired?", "type": "main", "index": 0 }]
+      ]
+    },
+    "É pix_expired?": {
+      "main": [
+        [{ "node": "Formatar Mensagem Pix Expirado", "type": "main", "index": 0 }],
+        [{ "node": "Responder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatar Mensagem Pix Expirado": {
+      "main": [
+        [{ "node": "Buscar Instância", "type": "main", "index": 0 }]
+      ]
+    },
+    "Buscar Instância": {
+      "main": [
+        [{ "node": "Enviar Alerta WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enviar Alerta WhatsApp": {
+      "main": [
+        [{ "node": "Responder", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

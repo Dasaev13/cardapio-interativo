@@ -1,0 +1,95 @@
+{
+  "name": "Novo Pedido - Cozinha (Impressão + Notificação)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kitchen-event",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook - Evento Cozinha",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.event }}",
+              "operation": "equals",
+              "value2": "order_confirmed"
+            }
+          ]
+        }
+      },
+      "id": "check-event",
+      "name": "É order_confirmed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BACKEND_URL }}/api/v1/admin/pedidos/{{ $json.data.pedido_id }}/print",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-internal-api-key",
+              "value": "={{ $env.INTERNAL_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 5000
+          }
+        }
+      },
+      "id": "trigger-print",
+      "name": "Disparar Impressão",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true, \"message\": \"Pedido enviado para cozinha\" }"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Evento Cozinha": {
+      "main": [
+        [{ "node": "É order_confirmed?", "type": "main", "index": 0 }]
+      ]
+    },
+    "É order_confirmed?": {
+      "main": [
+        [{ "node": "Disparar Impressão", "type": "main", "index": 0 }],
+        [{ "node": "Responder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Disparar Impressão": {
+      "main": [
+        [{ "node": "Responder", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

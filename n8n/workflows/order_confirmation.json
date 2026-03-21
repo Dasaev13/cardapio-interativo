@@ -1,0 +1,155 @@
+{
+  "name": "Confirmação de Pedido - WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-event",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-order",
+      "name": "Webhook - Evento de Pedido",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.event }}",
+              "operation": "equals",
+              "value2": "order_created"
+            }
+          ]
+        }
+      },
+      "id": "check-event",
+      "name": "É order_created?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BACKEND_URL }}/api/v1/orders/{{ $json.data.pedido_id }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "get-order",
+      "name": "Buscar Detalhes do Pedido",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const orderResponse = $input.first().json;\nconst pedido = orderResponse.data?.pedido || orderResponse.data;\nconst itens = orderResponse.data?.itens || [];\n\nif (!pedido) return [];\n\nconst statusUrl = `${$env.FRONTEND_URL}/pedido/${pedido.id}`;\n\n// Formatar itens\nconst itensText = itens.map(item => {\n  let line = `  • ${item.quantidade}x ${item.nome_produto}`;\n  if (item.opcoes_selecionadas?.length) {\n    line += ` (${item.opcoes_selecionadas.map(o => o.item_nome).join(', ')})`;\n  }\n  return line;\n}).join('\\n');\n\nconst formaMap = { pix: 'Pix', cartao: 'Cartão', dinheiro: 'Dinheiro' };\nconst formaLabel = formaMap[pedido.forma_pagamento] || pedido.forma_pagamento;\nconst tipoLabel = pedido.tipo_entrega === 'delivery' ? '🛵 Entrega' : '🏪 Retirada';\n\nconst total = parseFloat(pedido.total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });\n\nconst mensagem = `✅ *Pedido #${pedido.numero} recebido!*\\n\\n` +\n  `${tipoLabel}\\n\\n` +\n  `*Itens:*\\n${itensText}\\n\\n` +\n  `*Total: ${total}*\\n` +\n  `Pagamento: ${formaLabel}\\n\\n` +\n  `📍 Acompanhe seu pedido:\\n${statusUrl}`;\n\nreturn [{\n  json: {\n    phone: pedido.telefone_cliente,\n    message: mensagem,\n    pedido_id: pedido.id,\n    loja_id: pedido.loja_id,\n  }\n}];"
+      },
+      "id": "format-message",
+      "name": "Formatar Mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BACKEND_URL }}/api/v1/admin/loja",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-loja-id",
+              "value": "={{ $json.loja_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-loja",
+      "name": "Buscar Instância WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $json.data?.whatsapp_instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Formatar Mensagem').item.json.phone }}\",\n  \"options\": { \"delay\": 1000, \"presence\": \"composing\" },\n  \"textMessage\": { \"text\": \"{{ $('Formatar Mensagem').item.json.message.replace(/\"/g, '\\\\\"').replace(/\\n/g, '\\\\n') }}\" }\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "send-whatsapp",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true }"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Evento de Pedido": {
+      "main": [
+        [{ "node": "É order_created?", "type": "main", "index": 0 }]
+      ]
+    },
+    "É order_created?": {
+      "main": [
+        [{ "node": "Buscar Detalhes do Pedido", "type": "main", "index": 0 }],
+        [{ "node": "Responder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Buscar Detalhes do Pedido": {
+      "main": [
+        [{ "node": "Formatar Mensagem", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatar Mensagem": {
+      "main": [
+        [{ "node": "Buscar Instância WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Buscar Instância WhatsApp": {
+      "main": [
+        [{ "node": "Enviar WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enviar WhatsApp": {
+      "main": [
+        [{ "node": "Responder", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
