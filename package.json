@@ -19,7 +19,7 @@
   "devDependencies": {
     "concurrently": "^8.2.2"
   },
-  "resolutions": {
+  "overrides": {
     "ioredis": "5.4.1"
   }
 }
