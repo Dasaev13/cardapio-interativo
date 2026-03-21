@@ -14,7 +14,7 @@
     "dev:print": "npm run dev --workspace=print-service",
     "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
     "install:all": "npm install",
-    "start": "npm run dev --workspace=backend"
+    "start": "cd backend && node dist/index.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
