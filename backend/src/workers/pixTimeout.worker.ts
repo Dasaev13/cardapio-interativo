@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { getRedisClient } from '../config/redis';
+import { getRedisConnectionOptions } from '../config/redis';
 import { supabase } from '../config/supabase';
 import { sendN8nEvent } from '../services/whatsapp.service';
 
@@ -55,7 +55,7 @@ export function startPixTimeoutWorker(): Worker {
       console.log(`[PixTimeout] Pagamento ${pagamento_id} expirado com sucesso`);
     },
     {
-      connection: getRedisClient(),
+      connection: getRedisConnectionOptions(),
       concurrency: 10,
     }
   );

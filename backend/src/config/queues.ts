@@ -1,7 +1,7 @@
 import { Queue } from 'bullmq';
-import { getRedisClient } from './redis';
+import { getRedisConnectionOptions } from './redis';
 
-const connection = { connection: getRedisClient() };
+const connection = { connection: getRedisConnectionOptions() };
 
 export const pixTimeoutQueue = new Queue('pix-timeout', {
   ...connection,

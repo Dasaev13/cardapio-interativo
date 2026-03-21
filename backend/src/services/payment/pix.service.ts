@@ -105,13 +105,13 @@ async function createGerencianetPix(
   }
 
   // Buscar QR Code
-  const cobResponse = await response.json();
+  const cobResponse = await response.json() as GerencianetPixResponse & { loc?: { id: number } };
 
   const qrResponse = await fetch(`${baseUrl}/v2/loc/${cobResponse.loc?.id}/qrcode`, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
 
-  const qrData = await qrResponse.json();
+  const qrData = await qrResponse.json() as { imagemQrcode: string; qrcode: string };
 
   return {
     ...cobResponse,

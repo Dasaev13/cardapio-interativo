@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { getRedisClient } from '../config/redis';
+import { getRedisConnectionOptions } from '../config/redis';
 import { sendPrintJob } from '../services/print.service';
 
 interface PrintJobData {
@@ -15,7 +15,7 @@ export function startPrintWorker(): Worker {
       await sendPrintJob(job.data);
     },
     {
-      connection: getRedisClient(),
+      connection: getRedisConnectionOptions(),
       concurrency: 5,
     }
   );
