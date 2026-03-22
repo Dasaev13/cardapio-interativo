@@ -21,23 +21,47 @@ function asaasHeaders() {
 }
 
 async function createAsaasCustomer(nome: string, telefone: string): Promise<string> {
+  // 1. Tentar buscar cliente existente pelo externalReference (telefone)
+  const cleanPhone = telefone.replace(/\D/g, '');
+  const searchRes = await fetch(
+    `${asaasBaseUrl()}/customers?externalReference=${cleanPhone}&limit=1`,
+    { headers: asaasHeaders() }
+  );
+  if (searchRes.ok) {
+    const searchData = await searchRes.json() as { data?: Array<{ id: string }> };
+    if (searchData.data?.[0]?.id) return searchData.data[0].id;
+  }
+
+  // 2. Criar novo cliente (sem mobilePhone para evitar validação de número fake)
   const response = await fetch(`${asaasBaseUrl()}/customers`, {
     method: 'POST',
     headers: asaasHeaders(),
     body: JSON.stringify({
       name: nome || 'Cliente',
-      mobilePhone: telefone.replace(/\D/g, ''),
-      externalReference: telefone.replace(/\D/g, ''),
+      externalReference: cleanPhone,
       notificationDisabled: true,
     }),
   });
 
   if (!response.ok) {
+    // 3. Se falhar, usar cliente padrão configurado (deve ter CPF cadastrado)
+    if (env.ASAAS_DEFAULT_CUSTOMER_ID) {
+      console.warn('[Asaas] Usando customer padrão:', env.ASAAS_DEFAULT_CUSTOMER_ID);
+      return env.ASAAS_DEFAULT_CUSTOMER_ID;
+    }
     const text = await response.text();
     throw new AppError(502, `Erro ao criar cliente Asaas: ${text}`, 'PAYMENT_CUSTOMER_ERROR');
   }
 
-  const data = await response.json() as { id: string };
+  const data = await response.json() as { id: string; errors?: any[] };
+  if ((data as any).errors?.length) {
+    if (env.ASAAS_DEFAULT_CUSTOMER_ID) {
+      console.warn('[Asaas] Usando customer padrão por erro na criação:', (data as any).errors);
+      return env.ASAAS_DEFAULT_CUSTOMER_ID;
+    }
+    throw new AppError(502, `Erro ao criar cliente Asaas`, 'PAYMENT_CUSTOMER_ERROR');
+  }
+
   return data.id;
 }
 
@@ -46,33 +70,44 @@ async function createAsaasPix(customerId: string, valor: number, pedidoId: strin
   encodedImage: string;
   payload: string;
 }> {
-  // Criar cobrança Pix
   const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 1); // vence amanhã (controle de expiração é interno)
+  dueDate.setDate(dueDate.getDate() + 1);
   const dueDateStr = dueDate.toISOString().slice(0, 10);
 
-  const paymentRes = await fetch(`${asaasBaseUrl()}/payments`, {
-    method: 'POST',
-    headers: asaasHeaders(),
-    body: JSON.stringify({
-      customer: customerId,
-      billingType: 'PIX',
-      value: valor,
-      dueDate: dueDateStr,
-      description: 'Pagamento de pedido',
-      externalReference: pedidoId,
-    }),
-  });
+  const createPayment = async (custId: string) => {
+    const res = await fetch(`${asaasBaseUrl()}/payments`, {
+      method: 'POST',
+      headers: asaasHeaders(),
+      body: JSON.stringify({
+        customer: custId,
+        billingType: 'PIX',
+        value: valor,
+        dueDate: dueDateStr,
+        description: 'Pagamento de pedido',
+        externalReference: pedidoId,
+      }),
+    });
+    return res;
+  };
 
-  if (!paymentRes.ok) {
-    const text = await paymentRes.text();
-    throw new AppError(502, `Erro ao criar cobrança Asaas: ${text}`, 'PIX_GENERATION_ERROR');
+  let paymentRes = await createPayment(customerId);
+  let paymentData = await paymentRes.json() as any;
+
+  // Se erro de CPF, tentar com o customer padrão (que tem CPF)
+  if (paymentData.errors?.some((e: any) => e.description?.includes('CPF') || e.description?.includes('CNPJ'))) {
+    if (env.ASAAS_DEFAULT_CUSTOMER_ID && env.ASAAS_DEFAULT_CUSTOMER_ID !== customerId) {
+      console.warn('[Asaas] CPF necessário, tentando com customer padrão');
+      paymentRes = await createPayment(env.ASAAS_DEFAULT_CUSTOMER_ID);
+      paymentData = await paymentRes.json() as any;
+    }
   }
 
-  const payment = await paymentRes.json() as { id: string };
+  if (paymentData.errors?.length || !paymentData.id) {
+    throw new AppError(502, `Erro ao criar cobrança Asaas: ${JSON.stringify(paymentData.errors)}`, 'PIX_GENERATION_ERROR');
+  }
 
   // Buscar QR Code
-  const qrRes = await fetch(`${asaasBaseUrl()}/payments/${payment.id}/pixQrCode`, {
+  const qrRes = await fetch(`${asaasBaseUrl()}/payments/${paymentData.id}/pixQrCode`, {
     headers: asaasHeaders(),
   });
 
@@ -84,9 +119,9 @@ async function createAsaasPix(customerId: string, valor: number, pedidoId: strin
   const qrData = await qrRes.json() as { encodedImage: string; payload: string };
 
   return {
-    id: payment.id,
-    encodedImage: qrData.encodedImage, // já é base64 PNG
-    payload: qrData.payload,           // copia e cola
+    id: paymentData.id,
+    encodedImage: qrData.encodedImage,
+    payload: qrData.payload,
   };
 }
 

@@ -20,6 +20,7 @@ const envSchema = z.object({
   ASAAS_API_KEY: z.string().optional(),
   ASAAS_SANDBOX: z.string().default('true').transform(v => v === 'true'),
   ASAAS_WEBHOOK_TOKEN: z.string().optional(),
+  ASAAS_DEFAULT_CUSTOMER_ID: z.string().optional(),
 
   // Mercado Pago (Cartão)
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
