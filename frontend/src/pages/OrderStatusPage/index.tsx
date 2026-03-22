@@ -14,16 +14,24 @@ export default function OrderStatusPage() {
 
   const realtimeStatus = useRealtimeOrderStatus(pedidoId);
 
+  const fetchOrder = () => {
+    if (!pedidoId) return;
+    getOrder(pedidoId).then(data => {
+      setPedido(data);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  };
+
+  // Carga inicial
+  useEffect(() => { fetchOrder(); }, [pedidoId]);
+
+  // Polling a cada 5s como fallback ao realtime
   useEffect(() => {
-    if (pedidoId) {
-      getOrder(pedidoId).then(data => {
-        setPedido(data);
-        setLoading(false);
-      }).catch(() => setLoading(false));
-    }
+    const interval = setInterval(fetchOrder, 5000);
+    return () => clearInterval(interval);
   }, [pedidoId]);
 
-  // Atualizar status via realtime
+  // Atualizar status via realtime (quando disponível)
   useEffect(() => {
     if (realtimeStatus && pedido) {
       setPedido((prev: any) => ({ ...prev, pedido: { ...prev.pedido, status: realtimeStatus } }));

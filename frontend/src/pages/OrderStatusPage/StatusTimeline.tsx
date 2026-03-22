@@ -14,21 +14,21 @@ interface Step {
 
 const STEPS_DELIVERY: Step[] = [
   { id: 'confirmado', label: 'Pedido confirmado', icon: CheckCircle },
-  { id: 'em_preparo', label: 'Em preparo', icon: ChefHat },
-  { id: 'saiu_entrega', label: 'Saiu para entrega', icon: Bike },
+  { id: 'preparando', label: 'Em preparo', icon: ChefHat },
+  { id: 'pronto', label: 'Saiu para entrega', icon: Bike },
   { id: 'entregue', label: 'Entregue', icon: Package },
 ];
 
 const STEPS_RETIRADA: Step[] = [
   { id: 'confirmado', label: 'Pedido confirmado', icon: CheckCircle },
-  { id: 'em_preparo', label: 'Em preparo', icon: ChefHat },
+  { id: 'preparando', label: 'Em preparo', icon: ChefHat },
   { id: 'pronto', label: 'Pronto para retirada', icon: Package },
   { id: 'entregue', label: 'Retirado', icon: CheckCircle },
 ];
 
 const STATUS_ORDER = [
   'pendente', 'aguardando_pagamento', 'confirmado',
-  'em_preparo', 'pronto', 'saiu_entrega', 'entregue',
+  'preparando', 'pronto', 'entregue',
 ];
 
 function getStepIndex(status: string): number {
