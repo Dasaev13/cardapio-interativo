@@ -53,7 +53,7 @@ export default function AdminPage() {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_slug');
     setToken('');
-    navigate('/');
+    navigate('/admin');
   }
 
   const loadData = useCallback(async () => {
