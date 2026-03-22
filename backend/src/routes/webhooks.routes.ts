@@ -1,9 +1,6 @@
 import { Router } from 'express';
 import { webhookRateLimit } from '../middleware/rateLimiter';
-import {
-  captureRawBody,
-  verifyMercadoPagoSignature,
-} from '../middleware/webhookSignature';
+import { verifyMercadoPagoSignature } from '../middleware/webhookSignature';
 import {
   handleMercadoPagoWebhookController,
   handleWhatsAppWebhookController,
@@ -16,7 +13,6 @@ const router = Router();
 router.post(
   '/mercadopago',
   webhookRateLimit,
-  captureRawBody,
   verifyMercadoPagoSignature,
   handleMercadoPagoWebhookController
 );
