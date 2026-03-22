@@ -35,6 +35,9 @@ export default function CheckoutPage() {
     return null;
   }
 
+  // Após o guard acima, menu é sempre definido (TypeScript narrowing explícito)
+  if (!menu) return null;
+
   const { loja } = menu;
   const taxaEntrega = tipoEntrega === 'delivery' ? (deliveryResult?.taxa ?? 0) : 0;
   const total = totalPrice() + taxaEntrega;
