@@ -16,8 +16,11 @@ export function idempotencyMiddleware(req: Request, res: Response, next: NextFun
   const lockKey = `idempotency:lock:${idempotencyKey}`;
   const cacheKey = `idempotency:response:${idempotencyKey}`;
 
-  // Verificar se já existe resposta cacheada
-  redis.get(cacheKey).then(async (cached) => {
+  // Verificar se já existe resposta cacheada (timeout 3s para não travar sem Redis)
+  const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+
+  withTimeout(redis.get(cacheKey), 3000).then(async (cached) => {
     if (cached) {
       const { status, body } = JSON.parse(cached);
       res.status(status).json(body);
