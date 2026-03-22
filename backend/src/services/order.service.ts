@@ -218,8 +218,9 @@ export async function createPedido(input: CreatePedidoInput): Promise<PedidoComp
 
   // 11. Se pagamento em dinheiro ou retirada sem pagamento, confirmar diretamente
   if (input.forma_pagamento === 'dinheiro') {
-    // Enfileirar impressão
-    await printQueue.add('print-order', { pedido_id: pedido.id, loja_id: loja.id });
+    // Enfileirar impressão (assíncrono, não bloqueia resposta)
+    printQueue.add('print-order', { pedido_id: pedido.id, loja_id: loja.id })
+      .catch(err => console.error('[Order] Erro ao enfileirar impressão:', err.message));
   }
 
   return {
