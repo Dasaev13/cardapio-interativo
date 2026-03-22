@@ -27,10 +27,19 @@ export function idempotencyMiddleware(req: Request, res: Response, next: NextFun
       return;
     }
 
-    // Tentar adquirir lock para evitar race condition
-    const locked = await redis.set(lockKey, '1', 'EX', LOCK_TTL_SECONDS, 'NX');
+    // Tentar adquirir lock (com timeout para não travar se Redis cair)
+    const locked = await withTimeout(
+      redis.set(lockKey, '1', 'EX', LOCK_TTL_SECONDS, 'NX'),
+      3000
+    ).catch(() => null);
+
+    if (locked === null) {
+      // Redis falhou no lock — prosseguir sem idempotência
+      next();
+      return;
+    }
+
     if (!locked) {
-      // Outra request com mesma chave está em andamento
       res.status(409).json({
         error: {
           message: 'Requisição duplicada em andamento. Aguarde e tente novamente.',
