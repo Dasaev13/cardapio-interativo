@@ -7,7 +7,7 @@ export const enderecoSchema = z.object({
   bairro: z.string().min(1, 'Bairro é obrigatório'),
   cidade: z.string().min(1, 'Cidade é obrigatória'),
   estado: z.string().length(2, 'Estado deve ter 2 caracteres'),
-  cep: z.string().min(8, 'CEP inválido'),
+  cep: z.string().min(8, 'CEP inválido').optional().default(''),
   lat: z.number().optional(),
   lng: z.number().optional(),
   referencia: z.string().optional(),
