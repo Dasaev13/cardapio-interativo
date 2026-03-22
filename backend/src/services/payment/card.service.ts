@@ -112,8 +112,8 @@ export async function processCardPayment(input: CardPaymentInput): Promise<{
   }
 }
 
-export async function handleMercadoPagoWebhook(data: any): Promise<void> {
-  if (data.type !== 'payment' || !data.data?.id) return;
+export async function handleMercadoPagoWebhook(data: any): Promise<string | null> {
+  if (data.type !== 'payment' || !data.data?.id) return null;
 
   const client = getMercadoPagoClient();
   const payment = new Payment(client);
@@ -122,7 +122,7 @@ export async function handleMercadoPagoWebhook(data: any): Promise<void> {
     const mpPayment = await payment.get({ id: data.data.id });
 
     const pedidoId = mpPayment.external_reference;
-    if (!pedidoId) return;
+    if (!pedidoId) return null;
 
     const mpStatus = mpPayment.status;
     let status: string;
@@ -141,8 +141,22 @@ export async function handleMercadoPagoWebhook(data: any): Promise<void> {
       .eq('gateway_id', String(data.data.id))
       .eq('gateway', 'mercadopago');
 
-    console.log(`[MP] Pagamento ${data.data.id} → ${status}`);
+    console.log(`[MP] Pagamento ${data.data.id} → ${status} (${mpPayment.payment_method_id})`);
+
+    // Se aprovado, confirmar pedido automaticamente
+    if (status === 'aprovado') {
+      await supabase
+        .from('pedidos')
+        .update({ status: 'confirmado' })
+        .eq('id', pedidoId)
+        .in('status', ['pendente', 'aguardando_pagamento']);
+
+      return pedidoId;
+    }
+
+    return null;
   } catch (err) {
     console.error('[MP] Erro ao processar webhook:', err);
+    return null;
   }
 }

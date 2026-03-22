@@ -1,20 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
-import { handlePixWebhook } from '../services/payment/pix.service';
 import { handleMercadoPagoWebhook } from '../services/payment/card.service';
 import { processWhatsAppMessage } from '../services/whatsapp.service';
 import { supabase } from '../config/supabase';
 import { printQueue } from '../config/queues';
 
-export async function handlePixWebhookController(req: Request, res: Response, next: NextFunction): Promise<void> {
+
+export async function handleMercadoPagoWebhookController(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Responder imediatamente (Asaas exige resposta rápida)
     res.status(200).json({ ok: true });
 
-    // Processar de forma assíncrona
-    handlePixWebhook(req.body).then(async (pedidoId) => {
+    handleMercadoPagoWebhook(req.body).then(async (pedidoId) => {
       if (!pedidoId) return;
 
-      // Buscar loja_id para enfileirar impressão
       const { data: pedido } = await supabase
         .from('pedidos')
         .select('loja_id')
@@ -27,16 +24,7 @@ export async function handlePixWebhookController(req: Request, res: Response, ne
           loja_id: pedido.loja_id,
         });
       }
-    }).catch(err => console.error('[Webhook Pix] Erro:', err));
-  } catch (err) {
-    next(err);
-  }
-}
-
-export async function handleMercadoPagoWebhookController(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    res.status(200).json({ ok: true });
-    handleMercadoPagoWebhook(req.body).catch(err => console.error('[Webhook MP] Erro:', err));
+    }).catch(err => console.error('[Webhook MP] Erro:', err));
   } catch (err) {
     next(err);
   }

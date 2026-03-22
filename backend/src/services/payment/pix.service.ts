@@ -1,3 +1,4 @@
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import QRCode from 'qrcode';
 import { supabase } from '../../config/supabase';
 import { pixTimeoutQueue } from '../../config/queues';
@@ -5,124 +6,13 @@ import { AppError } from '../../middleware/errorHandler';
 import { env } from '../../config/env';
 import { PixPaymentInput } from '../../validators/payment.validator';
 
-const PIX_EXPIRY_MINUTES = 5;
+const PIX_EXPIRY_MINUTES = 30;
 
-function asaasBaseUrl(): string {
-  return env.ASAAS_SANDBOX
-    ? 'https://sandbox.asaas.com/api/v3'
-    : 'https://api.asaas.com/v3';
-}
-
-function asaasHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'access_token': env.ASAAS_API_KEY!,
-  };
-}
-
-async function createAsaasCustomer(nome: string, telefone: string): Promise<string> {
-  // 1. Tentar buscar cliente existente pelo externalReference (telefone)
-  const cleanPhone = telefone.replace(/\D/g, '');
-  const searchRes = await fetch(
-    `${asaasBaseUrl()}/customers?externalReference=${cleanPhone}&limit=1`,
-    { headers: asaasHeaders() }
-  );
-  if (searchRes.ok) {
-    const searchData = await searchRes.json() as { data?: Array<{ id: string }> };
-    if (searchData.data?.[0]?.id) return searchData.data[0].id;
+function getMercadoPagoClient() {
+  if (!env.MERCADOPAGO_ACCESS_TOKEN) {
+    throw new AppError(500, 'Mercado Pago não configurado', 'PAYMENT_CONFIG_ERROR');
   }
-
-  // 2. Criar novo cliente (sem mobilePhone para evitar validação de número fake)
-  const response = await fetch(`${asaasBaseUrl()}/customers`, {
-    method: 'POST',
-    headers: asaasHeaders(),
-    body: JSON.stringify({
-      name: nome || 'Cliente',
-      externalReference: cleanPhone,
-      notificationDisabled: true,
-    }),
-  });
-
-  if (!response.ok) {
-    // 3. Se falhar, usar cliente padrão configurado (deve ter CPF cadastrado)
-    if (env.ASAAS_DEFAULT_CUSTOMER_ID) {
-      console.warn('[Asaas] Usando customer padrão:', env.ASAAS_DEFAULT_CUSTOMER_ID);
-      return env.ASAAS_DEFAULT_CUSTOMER_ID;
-    }
-    const text = await response.text();
-    throw new AppError(502, `Erro ao criar cliente Asaas: ${text}`, 'PAYMENT_CUSTOMER_ERROR');
-  }
-
-  const data = await response.json() as { id: string; errors?: any[] };
-  if ((data as any).errors?.length) {
-    if (env.ASAAS_DEFAULT_CUSTOMER_ID) {
-      console.warn('[Asaas] Usando customer padrão por erro na criação:', (data as any).errors);
-      return env.ASAAS_DEFAULT_CUSTOMER_ID;
-    }
-    throw new AppError(502, `Erro ao criar cliente Asaas`, 'PAYMENT_CUSTOMER_ERROR');
-  }
-
-  return data.id;
-}
-
-async function createAsaasPix(customerId: string, valor: number, pedidoId: string): Promise<{
-  id: string;
-  encodedImage: string;
-  payload: string;
-}> {
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 1);
-  const dueDateStr = dueDate.toISOString().slice(0, 10);
-
-  const createPayment = async (custId: string) => {
-    const res = await fetch(`${asaasBaseUrl()}/payments`, {
-      method: 'POST',
-      headers: asaasHeaders(),
-      body: JSON.stringify({
-        customer: custId,
-        billingType: 'PIX',
-        value: valor,
-        dueDate: dueDateStr,
-        description: 'Pagamento de pedido',
-        externalReference: pedidoId,
-      }),
-    });
-    return res;
-  };
-
-  let paymentRes = await createPayment(customerId);
-  let paymentData = await paymentRes.json() as any;
-
-  // Se erro de CPF, tentar com o customer padrão (que tem CPF)
-  if (paymentData.errors?.some((e: any) => e.description?.includes('CPF') || e.description?.includes('CNPJ'))) {
-    if (env.ASAAS_DEFAULT_CUSTOMER_ID && env.ASAAS_DEFAULT_CUSTOMER_ID !== customerId) {
-      console.warn('[Asaas] CPF necessário, tentando com customer padrão');
-      paymentRes = await createPayment(env.ASAAS_DEFAULT_CUSTOMER_ID);
-      paymentData = await paymentRes.json() as any;
-    }
-  }
-
-  if (paymentData.errors?.length || !paymentData.id) {
-    throw new AppError(502, `Erro ao criar cobrança Asaas: ${JSON.stringify(paymentData.errors)}`, 'PIX_GENERATION_ERROR');
-  }
-
-  // Buscar QR Code
-  const qrRes = await fetch(`${asaasBaseUrl()}/payments/${paymentData.id}/pixQrCode`, {
-    headers: asaasHeaders(),
-  });
-
-  if (!qrRes.ok) {
-    const text = await qrRes.text();
-    throw new AppError(502, `Erro ao buscar QR Code Asaas: ${text}`, 'PIX_QRCODE_ERROR');
-  }
-
-  const qrData = await qrRes.json() as { encodedImage: string; payload: string };
-
-  return {
-    id: paymentData.id,
-    encodedImage: qrData.encodedImage,
-    payload: qrData.payload,
-  };
+  return new MercadoPagoConfig({ accessToken: env.MERCADOPAGO_ACCESS_TOKEN });
 }
 
 export async function generatePixPayment(input: PixPaymentInput): Promise<{
@@ -172,34 +62,42 @@ export async function generatePixPayment(input: PixPaymentInput): Promise<{
 
   let pixQrcode: string;
   let pixCopiaCola: string;
-  let asaasPaymentId: string;
+  let gatewayId: string;
 
-  if (env.ASAAS_API_KEY) {
-    try {
-      const customerId = await createAsaasCustomer(
-        pedido.nome_cliente || 'Cliente',
-        pedido.telefone_cliente
-      );
-      const pixData = await createAsaasPix(customerId, valor, pedido.id);
+  if (env.MERCADOPAGO_ACCESS_TOKEN) {
+    const client = getMercadoPagoClient();
+    const payment = new Payment(client);
 
-      asaasPaymentId = pixData.id;
-      // encodedImage já vem como base64 do Asaas (sem prefixo data:image)
-      pixQrcode = pixData.encodedImage.startsWith('data:')
-        ? pixData.encodedImage
-        : `data:image/png;base64,${pixData.encodedImage}`;
-      pixCopiaCola = pixData.payload;
-    } catch (err) {
-      console.error('[Pix] Erro Asaas, usando simulação:', err);
-      asaasPaymentId = `sim_${input.idempotency_key.replace(/-/g, '').slice(0, 20)}`;
-      pixCopiaCola = `PIX_SIMULADO_${asaasPaymentId}_${valor.toFixed(2)}`;
-      pixQrcode = await QRCode.toDataURL(pixCopiaCola);
+    const mpResponse = await payment.create({
+      body: {
+        transaction_amount: valor,
+        payment_method_id: 'pix',
+        payer: {
+          email: `cliente${pedido.telefone_cliente.replace(/\D/g, '')}@cardapio.app`,
+        },
+        date_of_expiration: expiraEm.toISOString(),
+        external_reference: pedido.id,
+        metadata: {
+          pedido_id: pedido.id,
+          loja_id: pedido.loja_id,
+        },
+      },
+    });
+
+    const txData = mpResponse.point_of_interaction?.transaction_data;
+    if (!txData?.qr_code || !txData?.qr_code_base64) {
+      throw new AppError(502, 'Erro ao gerar QR Code Pix', 'PIX_GENERATION_ERROR');
     }
+
+    gatewayId = String(mpResponse.id);
+    pixCopiaCola = txData.qr_code;
+    pixQrcode = `data:image/png;base64,${txData.qr_code_base64}`;
   } else {
-    // Modo desenvolvimento sem Asaas
-    asaasPaymentId = `sim_${input.idempotency_key.replace(/-/g, '').slice(0, 20)}`;
-    pixCopiaCola = `PIX_SIMULADO_${asaasPaymentId}_${valor.toFixed(2)}`;
+    // Modo simulação sem credenciais
+    gatewayId = `sim_${input.idempotency_key.replace(/-/g, '').slice(0, 20)}`;
+    pixCopiaCola = `PIX_SIMULADO_${gatewayId}_${valor.toFixed(2)}`;
     pixQrcode = await QRCode.toDataURL(pixCopiaCola);
-    console.warn('[Pix] Modo simulação - configure ASAAS_API_KEY para produção');
+    console.warn('[Pix] Modo simulação - configure MERCADOPAGO_ACCESS_TOKEN');
   }
 
   // Salvar pagamento no banco
@@ -211,9 +109,9 @@ export async function generatePixPayment(input: PixPaymentInput): Promise<{
       metodo: 'pix',
       status: 'pendente',
       valor,
-      gateway: 'asaas',
-      gateway_id: asaasPaymentId,
-      pix_txid: asaasPaymentId,
+      gateway: 'mercadopago',
+      gateway_id: gatewayId,
+      pix_txid: gatewayId,
       pix_qrcode: pixQrcode,
       pix_copia_cola: pixCopiaCola,
       pix_expira_em: expiraEm.toISOString(),
@@ -247,29 +145,4 @@ export async function generatePixPayment(input: PixPaymentInput): Promise<{
     pix_expira_em: expiraEm.toISOString(),
     valor,
   };
-}
-
-export async function handlePixWebhook(payload: any): Promise<string | null> {
-  // Payload Asaas: { event: 'PAYMENT_RECEIVED' | 'PAYMENT_CONFIRMED', payment: { id, value, status, ... } }
-  const confirmEvents = ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'];
-  if (!confirmEvents.includes(payload?.event)) return null;
-
-  const asaasId = payload?.payment?.id;
-  if (!asaasId) return null;
-
-  const { data: pagamento } = await supabase
-    .from('pagamentos')
-    .select('id, pedido_id, loja_id, status')
-    .eq('gateway_id', asaasId)
-    .single();
-
-  if (!pagamento || pagamento.status === 'aprovado') return null;
-
-  await supabase
-    .from('pagamentos')
-    .update({ status: 'aprovado', gateway_payload: payload.payment })
-    .eq('id', pagamento.id);
-
-  console.log(`[Pix] Pagamento confirmado: pedido ${pagamento.pedido_id}`);
-  return pagamento.pedido_id;
 }
