@@ -31,7 +31,7 @@ const PAYMENT_OPTIONS = [
   {
     id: 'dinheiro' as FormaPagamento,
     label: 'Dinheiro',
-    description: 'Na entrega',
+    description: 'Na entrega / retirada',
     icon: Banknote,
     iconColor: 'text-yellow-600',
     bgColor: 'bg-yellow-50',
@@ -42,11 +42,7 @@ export default function PaymentSelector({ loja, tipoEntrega, total }: Props) {
   const { formaPagamento, setFormaPagamento, trocoParа, setTroco } = useOrderStore();
   const [trocoInput, setTrocoInput] = useState(trocoParа?.toString() || '');
 
-  // Remover opção dinheiro se for pedido online (retirada só tem pix/cartão ou dinheiro dependendo config)
-  const availableOptions = PAYMENT_OPTIONS.filter(opt => {
-    if (opt.id === 'dinheiro' && tipoEntrega !== 'delivery') return false;
-    return true;
-  });
+  const availableOptions = PAYMENT_OPTIONS;
 
   return (
     <div className="bg-white rounded-2xl p-4">
