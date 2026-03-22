@@ -99,6 +99,18 @@ export async function processCardPayment(input: CardPaymentInput): Promise<{
       throw new AppError(500, 'Erro ao salvar pagamento', 'DB_ERROR');
     }
 
+    // Se aprovado imediatamente, confirmar pedido e enfileirar impressão
+    if (mpStatus === 'aprovado') {
+      await supabase
+        .from('pedidos')
+        .update({ status: 'confirmado' })
+        .eq('id', pedido.id)
+        .in('status', ['pendente', 'aguardando_pagamento']);
+
+      const { printQueue } = await import('../../config/queues');
+      printQueue.add('print-order', { pedido_id: pedido.id, loja_id: pedido.loja_id }).catch(() => {});
+    }
+
     return {
       pagamento_id: pagamento.id,
       gateway_id: String(mpResponse.id),
