@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Truck, Store } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
@@ -28,9 +28,9 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'delivery' | 'payment'>('delivery');
-  const [submitted, setSubmitted] = useState(false);
+  const submittedRef = useRef(false);
 
-  if (!submitted && (!menu || isEmpty())) {
+  if (!submittedRef.current && (!menu || isEmpty())) {
     navigate(`/${slug}`);
     return null;
   }
@@ -93,7 +93,7 @@ export default function CheckoutPage() {
       });
 
       setPedidoId(pedido.id);
-      setSubmitted(true);
+      submittedRef.current = true; // síncrono — protege o guard antes do clearCart re-render
       clearCart();
 
       // Redirecionar para página de pagamento
