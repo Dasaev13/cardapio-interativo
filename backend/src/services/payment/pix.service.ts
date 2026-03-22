@@ -82,6 +82,7 @@ export async function generatePixPayment(input: PixPaymentInput): Promise<{
           loja_id: pedido.loja_id,
         },
       },
+      requestOptions: { idempotencyKey: input.idempotency_key },
     });
 
     const txData = mpResponse.point_of_interaction?.transaction_data;
