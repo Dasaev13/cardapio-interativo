@@ -20,7 +20,7 @@ export default function PaymentPage() {
   const [error, setError] = useState<string | null>(null);
   const [orderTotal, setOrderTotal] = useState(0);
 
-  const { status } = usePaymentPolling(pagamentoId, 3000);
+  const { status } = usePaymentPolling(pagamentoId, 2000);
   const [cardError, setCardError] = useState<string | null>(null);
 
   // Buscar total do pedido para o Brick do cartão
@@ -29,6 +29,17 @@ export default function PaymentPage() {
       getOrder(pedidoId).then(data => setOrderTotal(Number(data?.pedido?.total || 0))).catch(() => {});
     }
   }, [pedidoId, formaPagamento]);
+
+  // Quando polling retorna QR code, atualizar pixData
+  useEffect(() => {
+    if (status?.pix_qrcode && status.pix_copia_cola && pixData && !pixData.pix_qrcode) {
+      setPixData(prev => prev ? {
+        ...prev,
+        pix_qrcode: status.pix_qrcode!,
+        pix_copia_cola: status.pix_copia_cola!,
+      } : prev);
+    }
+  }, [status?.pix_qrcode]);
 
   // Detectar pagamento aprovado
   useEffect(() => {
@@ -39,6 +50,11 @@ export default function PaymentPage() {
     }
     if (status?.status === 'expirado') {
       toast.error('Pix expirado. Tente novamente.');
+      setPixData(null);
+      setPagamentoId('');
+    }
+    if (status?.status === 'erro') {
+      toast.error('Erro ao gerar Pix. Tente novamente.');
       setPixData(null);
       setPagamentoId('');
     }
@@ -94,11 +110,14 @@ export default function PaymentPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 size={40} className="animate-spin text-red-500 mx-auto mb-3" />
-          <p className="text-gray-500">Gerando QR Code Pix...</p>
+          <p className="text-gray-500">Criando pagamento...</p>
         </div>
       </div>
     );
   }
+
+  // QR Code ainda sendo gerado (polling ativo)
+  const qrCodeGerandoState = pixData && !pixData.pix_qrcode && !status?.pix_qrcode;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -107,9 +126,19 @@ export default function PaymentPage() {
 
         {formaPagamento === 'pix' && (
           <>
-            {pixData ? (
+            {qrCodeGerandoState ? (
+              <div className="bg-white rounded-2xl p-8 shadow-card text-center">
+                <Loader2 size={40} className="animate-spin text-green-500 mx-auto mb-3" />
+                <p className="text-gray-600 font-medium">Gerando QR Code Pix...</p>
+                <p className="text-gray-400 text-sm mt-1">Aguarde alguns segundos</p>
+              </div>
+            ) : pixData?.pix_qrcode || status?.pix_qrcode ? (
               <PixDisplay
-                pixData={pixData}
+                pixData={{
+                  ...pixData!,
+                  pix_qrcode: (pixData?.pix_qrcode || status?.pix_qrcode)!,
+                  pix_copia_cola: (pixData?.pix_copia_cola || status?.pix_copia_cola)!,
+                }}
                 onExpire={() => {
                   setPixData(null);
                   setPagamentoId('');

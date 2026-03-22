@@ -15,10 +15,50 @@ function getMercadoPagoClient() {
   return new MercadoPagoConfig({ accessToken: env.MERCADOPAGO_ACCESS_TOKEN });
 }
 
+async function gerarQrCodeMP(pagamentoId: string, pedidoId: string, lojaId: string, valor: number, expiraEm: Date, idempotencyKey: string, telefone: string) {
+  try {
+    const client = getMercadoPagoClient();
+    const payment = new Payment(client);
+
+    const mpResponse = await payment.create({
+      body: {
+        transaction_amount: valor,
+        payment_method_id: 'pix',
+        payer: { email: `cliente${telefone.replace(/\D/g, '')}@cardapio.app` },
+        date_of_expiration: expiraEm.toISOString(),
+        external_reference: pedidoId,
+        metadata: { pedido_id: pedidoId, loja_id: lojaId },
+      },
+      requestOptions: { idempotencyKey },
+    });
+
+    const txData = mpResponse.point_of_interaction?.transaction_data;
+    if (!txData?.qr_code || !txData?.qr_code_base64) {
+      throw new Error('QR Code não retornado pelo MP');
+    }
+
+    await supabase
+      .from('pagamentos')
+      .update({
+        gateway_id: String(mpResponse.id),
+        pix_txid: String(mpResponse.id),
+        pix_qrcode: `data:image/png;base64,${txData.qr_code_base64}`,
+        pix_copia_cola: txData.qr_code,
+        status: 'pendente',
+      })
+      .eq('id', pagamentoId);
+
+    console.log(`[Pix] QR Code gerado para pagamento ${pagamentoId}`);
+  } catch (err) {
+    console.error('[Pix] Erro ao gerar QR Code MP:', err);
+    await supabase.from('pagamentos').update({ status: 'erro' }).eq('id', pagamentoId);
+  }
+}
+
 export async function generatePixPayment(input: PixPaymentInput): Promise<{
   pagamento_id: string;
-  pix_qrcode: string;
-  pix_copia_cola: string;
+  pix_qrcode: string | null;
+  pix_copia_cola: string | null;
   pix_expira_em: string;
   valor: number;
 }> {
@@ -60,61 +100,20 @@ export async function generatePixPayment(input: PixPaymentInput): Promise<{
   const valor = Number(pedido.total);
   const expiraEm = new Date(Date.now() + PIX_EXPIRY_MINUTES * 60 * 1000);
 
-  let pixQrcode: string;
-  let pixCopiaCola: string;
-  let gatewayId: string;
-
-  if (env.MERCADOPAGO_ACCESS_TOKEN) {
-    const client = getMercadoPagoClient();
-    const payment = new Payment(client);
-
-    const mpResponse = await payment.create({
-      body: {
-        transaction_amount: valor,
-        payment_method_id: 'pix',
-        payer: {
-          email: `cliente${pedido.telefone_cliente.replace(/\D/g, '')}@cardapio.app`,
-        },
-        date_of_expiration: expiraEm.toISOString(),
-        external_reference: pedido.id,
-        metadata: {
-          pedido_id: pedido.id,
-          loja_id: pedido.loja_id,
-        },
-      },
-      requestOptions: { idempotencyKey: input.idempotency_key },
-    });
-
-    const txData = mpResponse.point_of_interaction?.transaction_data;
-    if (!txData?.qr_code || !txData?.qr_code_base64) {
-      throw new AppError(502, 'Erro ao gerar QR Code Pix', 'PIX_GENERATION_ERROR');
-    }
-
-    gatewayId = String(mpResponse.id);
-    pixCopiaCola = txData.qr_code;
-    pixQrcode = `data:image/png;base64,${txData.qr_code_base64}`;
-  } else {
-    // Modo simulação sem credenciais
-    gatewayId = `sim_${input.idempotency_key.replace(/-/g, '').slice(0, 20)}`;
-    pixCopiaCola = `PIX_SIMULADO_${gatewayId}_${valor.toFixed(2)}`;
-    pixQrcode = await QRCode.toDataURL(pixCopiaCola);
-    console.warn('[Pix] Modo simulação - configure MERCADOPAGO_ACCESS_TOKEN');
-  }
-
-  // Salvar pagamento no banco
+  // Criar registro imediatamente com status 'gerando'
   const { data: pagamento, error: pgError } = await supabase
     .from('pagamentos')
     .insert({
       pedido_id: pedido.id,
       loja_id: pedido.loja_id,
       metodo: 'pix',
-      status: 'pendente',
+      status: 'gerando',
       valor,
       gateway: 'mercadopago',
-      gateway_id: gatewayId,
-      pix_txid: gatewayId,
-      pix_qrcode: pixQrcode,
-      pix_copia_cola: pixCopiaCola,
+      gateway_id: `pending_${input.idempotency_key.slice(0, 8)}`,
+      pix_txid: null,
+      pix_qrcode: null,
+      pix_copia_cola: null,
       pix_expira_em: expiraEm.toISOString(),
       idempotency_key: input.idempotency_key,
     })
@@ -131,18 +130,33 @@ export async function generatePixPayment(input: PixPaymentInput): Promise<{
     .update({ status: 'aguardando_pagamento' })
     .eq('id', pedido.id);
 
+  // Gerar QR Code em background (não bloqueia a resposta)
+  if (env.MERCADOPAGO_ACCESS_TOKEN) {
+    gerarQrCodeMP(pagamento.id, pedido.id, pedido.loja_id, valor, expiraEm, input.idempotency_key, pedido.telefone_cliente);
+  } else {
+    // Simulação
+    const pixCopiaCola = `PIX_SIMULADO_${pagamento.id}_${valor.toFixed(2)}`;
+    QRCode.toDataURL(pixCopiaCola).then(async (qr) => {
+      await supabase.from('pagamentos').update({
+        pix_qrcode: qr, pix_copia_cola: pixCopiaCola, status: 'pendente',
+        gateway_id: pagamento.id, pix_txid: pagamento.id,
+      }).eq('id', pagamento.id);
+    });
+  }
+
   // Enfileirar job de timeout
   const delayMs = expiraEm.getTime() - Date.now();
   await pixTimeoutQueue.add(
     'pix-timeout',
     { pagamento_id: pagamento.id, pedido_id: pedido.id, loja_id: pedido.loja_id, telefone: pedido.telefone_cliente },
     { delay: delayMs, jobId: `pix-timeout-${pagamento.id}` }
-  );
+  ).catch(() => {}); // Redis pode estar indisponível
 
+  // Retornar imediatamente (QR Code null, frontend vai fazer polling)
   return {
     pagamento_id: pagamento.id,
-    pix_qrcode: pixQrcode,
-    pix_copia_cola: pixCopiaCola,
+    pix_qrcode: null,
+    pix_copia_cola: null,
     pix_expira_em: expiraEm.toISOString(),
     valor,
   };

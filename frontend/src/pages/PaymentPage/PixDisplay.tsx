@@ -34,7 +34,7 @@ export default function PixDisplay({ pixData, onExpire, onRefresh }: Props) {
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(pixData.pix_copia_cola);
+      await navigator.clipboard.writeText(pixData.pix_copia_cola ?? '');
       setCopied(true);
       toast.success('Código Pix copiado!');
       setTimeout(() => setCopied(false), 3000);

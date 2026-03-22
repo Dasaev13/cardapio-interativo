@@ -41,7 +41,7 @@ export async function getPaymentStatus(req: Request, res: Response, next: NextFu
 
     const { data, error } = await supabase
       .from('pagamentos')
-      .select('id, metodo, status, valor, pix_expira_em, card_last_four, card_brand, created_at, updated_at')
+      .select('id, metodo, status, valor, pix_qrcode, pix_copia_cola, pix_expira_em, card_last_four, card_brand, created_at, updated_at')
       .eq('id', id)
       .single();
 
