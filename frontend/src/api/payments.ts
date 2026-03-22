@@ -23,6 +23,21 @@ export async function createCashPayment(params: {
   return data.data;
 }
 
+export async function createCardPayment(params: {
+  pedido_id: string;
+  token: string;
+  installments: number;
+  payment_method_id: string;
+  email?: string;
+  cpf?: string;
+  idempotency_key: string;
+}): Promise<{ pagamento_id: string; gateway_id: string; status: string; card_last_four?: string; card_brand?: string }> {
+  const { data } = await apiClient.post('/payments/card', params, {
+    headers: { 'X-Idempotency-Key': params.idempotency_key },
+  });
+  return data.data;
+}
+
 export async function getPaymentStatus(pagamentoId: string): Promise<PaymentStatus> {
   const { data } = await apiClient.get<{ data: PaymentStatus }>(`/payments/${pagamentoId}/status`);
   return data.data;

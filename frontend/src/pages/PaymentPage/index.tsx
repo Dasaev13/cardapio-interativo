@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../../store/orderStore';
 import { createPixPayment } from '../../api/payments';
+import { getOrder } from '../../api/orders';
 import { generateUUID } from '../../utils/format';
 import { usePaymentPolling } from '../../hooks/usePayment';
 import PixDisplay from './PixDisplay';
+import CardPayment from './CardPayment';
 import toast from 'react-hot-toast';
 import type { PixPayment } from '../../types/payment';
 import { CheckCircle, Loader2 } from 'lucide-react';
@@ -16,8 +18,17 @@ export default function PaymentPage() {
   const [pixData, setPixData] = useState<PixPayment | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orderTotal, setOrderTotal] = useState(0);
 
   const { status } = usePaymentPolling(pagamentoId, 3000);
+  const [cardError, setCardError] = useState<string | null>(null);
+
+  // Buscar total do pedido para o Brick do cartão
+  useEffect(() => {
+    if (pedidoId && formaPagamento === 'cartao') {
+      getOrder(pedidoId).then(data => setOrderTotal(Number(data?.pedido?.total || 0))).catch(() => {});
+    }
+  }, [pedidoId, formaPagamento]);
 
   // Detectar pagamento aprovado
   useEffect(() => {
@@ -114,6 +125,28 @@ export default function PaymentPage() {
               </div>
             ) : null}
           </>
+        )}
+
+        {formaPagamento === 'cartao' && (
+          <div className="bg-white rounded-2xl p-4 shadow-card">
+            {cardError && (
+              <div className="mb-4 p-3 bg-red-50 rounded-xl text-sm text-red-600">
+                {cardError}
+              </div>
+            )}
+            <CardPayment
+              pedidoId={pedidoId}
+              total={orderTotal}
+              onSuccess={(pagamentoId) => {
+                setPagamentoId(pagamentoId);
+                toast.success('Cartão aprovado! Aguardando confirmação...');
+              }}
+              onError={(msg) => {
+                setCardError(msg);
+                toast.error(msg);
+              }}
+            />
+          </div>
         )}
       </div>
     </div>
