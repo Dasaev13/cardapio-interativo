@@ -70,10 +70,14 @@ export default function OrdersSection({ lojaId }: { lojaId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = filter === 'ativos'
-        ? '?status=pendente&status=aguardando_pagamento&status=confirmado&status=preparando&status=pronto'
-        : filter !== 'todos' ? `?status=${filter}` : '';
-      const res = await apiClient.get(`/admin/pedidos${params}&limit=50`);
+      const ativos = ['pendente', 'aguardando_pagamento', 'confirmado', 'preparando', 'pronto'];
+      const params = new URLSearchParams({ limit: '50' });
+      if (filter === 'ativos') {
+        ativos.forEach(s => params.append('status', s));
+      } else if (filter !== 'todos') {
+        params.set('status', filter);
+      }
+      const res = await apiClient.get(`/admin/pedidos?${params.toString()}`);
       setOrders(res.data.data || []);
     } catch {
       setOrders([]);

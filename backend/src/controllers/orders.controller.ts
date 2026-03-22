@@ -40,7 +40,10 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1);
 
-    if (status) query = query.eq('status', status as string);
+    if (status) {
+      const statuses = Array.isArray(status) ? status as string[] : [status as string];
+      query = statuses.length === 1 ? query.eq('status', statuses[0]) : query.in('status', statuses);
+    }
     if (data_inicio) query = query.gte('created_at', `${data_inicio}T00:00:00`);
     if (data_fim) query = query.lte('created_at', `${data_fim}T23:59:59`);
 
