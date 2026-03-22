@@ -28,8 +28,9 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'delivery' | 'payment'>('delivery');
+  const [submitted, setSubmitted] = useState(false);
 
-  if (!menu || isEmpty()) {
+  if (!submitted && (!menu || isEmpty())) {
     navigate(`/${slug}`);
     return null;
   }
@@ -92,6 +93,7 @@ export default function CheckoutPage() {
       });
 
       setPedidoId(pedido.id);
+      setSubmitted(true);
       clearCart();
 
       // Redirecionar para página de pagamento

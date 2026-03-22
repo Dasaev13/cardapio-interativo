@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { webhookRateLimit } from '../middleware/rateLimiter';
 import {
   captureRawBody,
-  verifyGerencianetSignature,
+  verifyAsaasWebhook,
   verifyMercadoPagoSignature,
 } from '../middleware/webhookSignature';
 import {
@@ -17,8 +17,7 @@ const router = Router();
 router.post(
   '/pix',
   webhookRateLimit,
-  captureRawBody,
-  verifyGerencianetSignature,
+  verifyAsaasWebhook,
   handlePixWebhookController
 );
 

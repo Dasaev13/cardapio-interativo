@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { env } from '../config/env';
 import { AppError } from './errorHandler';
 
+// crypto still used by verifyMercadoPagoSignature below
+
 // Capturar rawBody para verificação de assinatura
 export function captureRawBody(req: Request, res: Response, next: NextFunction): void {
   const chunks: Buffer[] = [];
@@ -18,27 +20,22 @@ export function captureRawBody(req: Request, res: Response, next: NextFunction):
   });
 }
 
-// Verificar assinatura HMAC do Gerencianet
-export function verifyGerencianetSignature(req: Request, res: Response, next: NextFunction): void {
-  const secret = env.GERENCIANET_WEBHOOK_SECRET;
-  if (!secret) {
+// Verificar token de webhook do Asaas
+export function verifyAsaasWebhook(req: Request, res: Response, next: NextFunction): void {
+  const token = env.ASAAS_WEBHOOK_TOKEN;
+  if (!token) {
     next();
     return;
   }
 
-  const signature = req.headers['x-gerencianet-hmac'] as string;
-  if (!signature || !req.rawBody) {
-    next(new AppError(401, 'Assinatura webhook ausente', 'INVALID_SIGNATURE'));
+  const receivedToken = req.headers['asaas-access-token'] as string;
+  if (!receivedToken) {
+    next(new AppError(401, 'Token webhook Asaas ausente', 'INVALID_SIGNATURE'));
     return;
   }
 
-  const expectedSig = crypto
-    .createHmac('sha256', secret)
-    .update(req.rawBody)
-    .digest('hex');
-
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
-    next(new AppError(401, 'Assinatura webhook inválida', 'INVALID_SIGNATURE'));
+  if (receivedToken !== token) {
+    next(new AppError(401, 'Token webhook Asaas inválido', 'INVALID_SIGNATURE'));
     return;
   }
 

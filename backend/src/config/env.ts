@@ -16,12 +16,10 @@ const envSchema = z.object({
   // Redis
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
-  // Gerencianet (Pix)
-  GERENCIANET_CLIENT_ID: z.string().optional(),
-  GERENCIANET_CLIENT_SECRET: z.string().optional(),
-  GERENCIANET_PIX_KEY: z.string().optional(),
-  GERENCIANET_SANDBOX: z.string().default('true').transform(v => v === 'true'),
-  GERENCIANET_WEBHOOK_SECRET: z.string().optional(),
+  // Asaas (Pix)
+  ASAAS_API_KEY: z.string().optional(),
+  ASAAS_SANDBOX: z.string().default('true').transform(v => v === 'true'),
+  ASAAS_WEBHOOK_TOKEN: z.string().optional(),
 
   // Mercado Pago (Cartão)
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),

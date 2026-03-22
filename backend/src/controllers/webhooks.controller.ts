@@ -7,25 +7,25 @@ import { printQueue } from '../config/queues';
 
 export async function handlePixWebhookController(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Responder imediatamente (Gerencianet exige resposta rápida)
+    // Responder imediatamente (Asaas exige resposta rápida)
     res.status(200).json({ ok: true });
 
     // Processar de forma assíncrona
-    handlePixWebhook(req.body).then(async () => {
-      // Se aprovado, enfileirar impressão
-      if (req.body?.pix?.[0]?.txid) {
-        const { data: pagamento } = await supabase
-          .from('pagamentos')
-          .select('pedido_id, loja_id')
-          .eq('pix_txid', req.body.pix[0].txid)
-          .single();
+    handlePixWebhook(req.body).then(async (pedidoId) => {
+      if (!pedidoId) return;
 
-        if (pagamento) {
-          await printQueue.add('print-order', {
-            pedido_id: pagamento.pedido_id,
-            loja_id: pagamento.loja_id,
-          });
-        }
+      // Buscar loja_id para enfileirar impressão
+      const { data: pedido } = await supabase
+        .from('pedidos')
+        .select('loja_id')
+        .eq('id', pedidoId)
+        .single();
+
+      if (pedido) {
+        await printQueue.add('print-order', {
+          pedido_id: pedidoId,
+          loja_id: pedido.loja_id,
+        });
       }
     }).catch(err => console.error('[Webhook Pix] Erro:', err));
   } catch (err) {
