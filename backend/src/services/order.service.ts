@@ -247,7 +247,7 @@ export async function updatePedidoStatus(
 ): Promise<void> {
   const validStatuses = [
     'pendente', 'aguardando_pagamento', 'confirmado',
-    'em_preparo', 'pronto', 'saiu_entrega',
+    'preparando', 'pronto',
     'entregue', 'cancelado', 'recusado',
   ];
 
