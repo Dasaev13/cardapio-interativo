@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, LogOut, ExternalLink, ChefHat } from 'lucide-react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, LogOut, ExternalLink, ChefHat, ClipboardList } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { apiClient } from '../../api/client';
 import LoginPage from './LoginPage';
 import ProductForm from './ProductForm';
+import OrdersSection from './OrdersSection';
 
 interface Category {
   id: string;
@@ -30,13 +31,14 @@ export default function AdminPage() {
 
   const [token, setToken] = useState(() => localStorage.getItem('admin_token') || '');
   const [lojaSlug, setLojaSlug] = useState(() => localStorage.getItem('admin_slug') || slug || '');
-  const [loja, setLoja] = useState<{ nome: string; aberto: boolean } | null>(null);
+  const [loja, setLoja] = useState<{ id: string; nome: string; aberto: boolean } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCat, setSelectedCat] = useState<string>('all');
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'cardapio'>('pedidos');
 
   const isLogged = !!token;
 
@@ -157,6 +159,36 @@ export default function AdminPage() {
       </header>
 
       <div className="max-w-4xl mx-auto p-4">
+        {/* Abas */}
+        <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab('pedidos')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'pedidos' ? 'bg-white shadow text-green-800' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <ClipboardList size={16} />
+            Pedidos
+          </button>
+          <button
+            onClick={() => setActiveTab('cardapio')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'cardapio' ? 'bg-white shadow text-green-800' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <ChefHat size={16} />
+            Cardápio
+          </button>
+        </div>
+
+        {/* Seção Pedidos */}
+        {activeTab === 'pedidos' && loja && (
+          <OrdersSection lojaId={loja.id} />
+        )}
+
+        {/* Seção Cardápio */}
+        {activeTab === 'cardapio' && (
+          <>
         {/* Toolbar */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-800">Cardápio</h2>
@@ -268,6 +300,8 @@ export default function AdminPage() {
               </div>
             ))}
           </div>
+        )}
+          </>
         )}
       </div>
 
