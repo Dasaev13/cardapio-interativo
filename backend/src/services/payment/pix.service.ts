@@ -51,7 +51,7 @@ async function gerarQrCodeMP(pagamentoId: string, pedidoId: string, lojaId: stri
     console.log(`[Pix] QR Code gerado para pagamento ${pagamentoId}`);
   } catch (err) {
     console.error('[Pix] Erro ao gerar QR Code MP:', err);
-    await supabase.from('pagamentos').update({ status: 'erro' }).eq('id', pagamentoId);
+    await supabase.from('pagamentos').update({ status: 'cancelado' }).eq('id', pagamentoId);
   }
 }
 
@@ -107,7 +107,7 @@ export async function generatePixPayment(input: PixPaymentInput): Promise<{
       pedido_id: pedido.id,
       loja_id: pedido.loja_id,
       metodo: 'pix',
-      status: 'gerando',
+      status: 'processando',
       valor,
       gateway: 'mercadopago',
       gateway_id: `pending_${input.idempotency_key.slice(0, 8)}`,

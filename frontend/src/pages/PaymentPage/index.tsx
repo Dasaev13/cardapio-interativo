@@ -53,7 +53,7 @@ export default function PaymentPage() {
       setPixData(null);
       setPagamentoId('');
     }
-    if (status?.status === 'erro') {
+    if (status?.status === 'cancelado' && pixData && !pixData.pix_qrcode && !status?.pix_qrcode) {
       toast.error('Erro ao gerar Pix. Tente novamente.');
       setPixData(null);
       setPagamentoId('');

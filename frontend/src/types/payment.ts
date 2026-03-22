@@ -9,7 +9,7 @@ export interface PixPayment {
 export interface PaymentStatus {
   id: string;
   metodo: 'pix' | 'cartao' | 'dinheiro';
-  status: 'gerando' | 'pendente' | 'processando' | 'aprovado' | 'recusado' | 'expirado' | 'reembolsado' | 'cancelado' | 'erro';
+  status: 'pendente' | 'processando' | 'aprovado' | 'recusado' | 'expirado' | 'reembolsado' | 'cancelado';
   valor: number;
   pix_qrcode?: string | null;
   pix_copia_cola?: string | null;
