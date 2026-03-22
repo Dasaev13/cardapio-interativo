@@ -107,6 +107,9 @@ export default function OrdersSection({ lojaId }: { lojaId: string }) {
     try {
       await apiClient.put(`/admin/pedidos/${orderId}/status`, { status: nextStatus });
       await load();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || 'Erro desconhecido';
+      alert(`Erro ao atualizar status: ${msg}`);
     } finally {
       setUpdating(null);
     }
