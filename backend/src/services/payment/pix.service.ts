@@ -144,9 +144,9 @@ export async function generatePixPayment(input: PixPaymentInput): Promise<{
     });
   }
 
-  // Enfileirar job de timeout
+  // Enfileirar job de timeout (fire-and-forget — não bloqueia resposta)
   const delayMs = expiraEm.getTime() - Date.now();
-  await pixTimeoutQueue.add(
+  pixTimeoutQueue.add(
     'pix-timeout',
     { pagamento_id: pagamento.id, pedido_id: pedido.id, loja_id: pedido.loja_id, telefone: pedido.telefone_cliente },
     { delay: delayMs, jobId: `pix-timeout-${pagamento.id}` }
