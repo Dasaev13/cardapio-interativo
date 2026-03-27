@@ -42,11 +42,11 @@ export async function handleWhatsAppWebhookController(req: Request, res: Respons
 
     if (!phone || !message) return;
 
-    // Buscar loja pela instância Evolution API
+    // Buscar loja pela instância Evolution API (config->>'whatsapp_instance')
     const { data: loja } = await supabase
       .from('lojas')
       .select('id, slug, nome, aberto, config')
-      .eq('whatsapp_instance', instance)
+      .eq('config->>whatsapp_instance', instance)
       .eq('ativo', true)
       .single();
 
