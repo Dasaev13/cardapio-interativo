@@ -8,7 +8,7 @@ import {
   listSessions, takeoverSession, releaseSession,
   reprintOrder, getDashboardStats,
 } from '../controllers/admin.controller';
-import { listOrders, updateOrderStatus, listMesas, fecharMesa } from '../controllers/orders.controller';
+import { listOrders, updateOrderStatus, listMesas, fecharMesa, checkoutMesa } from '../controllers/orders.controller';
 
 const router = Router();
 
@@ -40,6 +40,7 @@ router.post('/pedidos/:id/print', reprintOrder);
 
 // Mesas (comanda)
 router.get('/mesas', listMesas);
+router.post('/mesas/:mesa/checkout', checkoutMesa);
 router.put('/mesas/:mesa/fechar', fecharMesa);
 
 // Bairros de entrega

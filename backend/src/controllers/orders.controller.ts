@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { createPedidoSchema } from '../validators/order.validator';
 import { createPedido, getPedidoById, updatePedidoStatus } from '../services/order.service';
+import { generatePixForMesa } from '../services/payment/pix.service';
 import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
 
@@ -95,6 +96,53 @@ export async function listMesas(req: Request, res: Response, next: NextFunction)
   }
 }
 
+export async function checkoutMesa(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const lojaId = req.lojaId!;
+    const { mesa } = req.params;
+    const { forma_pagamento } = req.body;
+
+    if (!['dinheiro', 'cartao', 'pix'].includes(forma_pagamento)) {
+      throw new AppError(400, 'Forma de pagamento inválida', 'INVALID_PAYMENT');
+    }
+
+    // Buscar pedidos abertos da mesa
+    const { data: pedidos, error } = await supabase
+      .from('pedidos')
+      .select('id, total')
+      .eq('loja_id', lojaId)
+      .eq('mesa', mesa)
+      .not('status', 'in', '(cancelado,entregue)');
+
+    if (error) throw error;
+    if (!pedidos || pedidos.length === 0) {
+      throw new AppError(404, 'Nenhum pedido aberto para esta mesa', 'MESA_SEM_PEDIDOS');
+    }
+
+    const total = pedidos.reduce((sum, p) => sum + Number(p.total), 0);
+
+    if (forma_pagamento === 'pix') {
+      // Gerar Pix para o total consolidado da mesa
+      const result = await generatePixForMesa(lojaId, mesa, total, pedidos[0].id);
+      res.json({ data: { ...result, forma_pagamento: 'pix', aguardando_pix: true } });
+      return;
+    }
+
+    // Dinheiro ou Cartão: fechar imediatamente
+    const { error: updateError } = await supabase
+      .from('pedidos')
+      .update({ status: 'entregue', forma_pagamento })
+      .eq('loja_id', lojaId)
+      .eq('mesa', mesa)
+      .not('status', 'in', '(cancelado,entregue)');
+
+    if (updateError) throw updateError;
+    res.json({ data: { success: true, total, forma_pagamento } });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function fecharMesa(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const lojaId = req.lojaId!;
@@ -102,7 +150,7 @@ export async function fecharMesa(req: Request, res: Response, next: NextFunction
 
     const { error } = await supabase
       .from('pedidos')
-      .update({ status: 'entregue' })
+      .update({ status: 'entregue', forma_pagamento: 'pix' })
       .eq('loja_id', lojaId)
       .eq('mesa', mesa)
       .not('status', 'in', '(cancelado,entregue)');

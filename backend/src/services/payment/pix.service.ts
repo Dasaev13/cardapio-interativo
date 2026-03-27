@@ -55,6 +55,51 @@ async function gerarQrCodeMP(pagamentoId: string, pedidoId: string, lojaId: stri
   }
 }
 
+export async function generatePixForMesa(lojaId: string, mesa: string, total: number, primeiroPedidoId: string): Promise<{
+  pagamento_id: string;
+  pix_qrcode: string | null;
+  pix_copia_cola: string | null;
+  pix_expira_em: string;
+  valor: number;
+}> {
+  const valor = total;
+  const expiraEm = new Date(Date.now() + PIX_EXPIRY_MINUTES * 60 * 1000);
+  const idempotencyKey = `mesa-${lojaId}-${mesa}-${Date.now()}`;
+
+  const { data: pagamento, error: pgError } = await supabase
+    .from('pagamentos')
+    .insert({
+      pedido_id: primeiroPedidoId,
+      loja_id: lojaId,
+      metodo: 'pix',
+      status: 'processando',
+      valor,
+      gateway: 'mercadopago',
+      gateway_id: `pending_mesa_${mesa}_${Date.now()}`,
+      pix_txid: null,
+      pix_qrcode: null,
+      pix_copia_cola: null,
+      pix_expira_em: expiraEm.toISOString(),
+      idempotency_key: idempotencyKey,
+    })
+    .select('id')
+    .single();
+
+  if (pgError || !pagamento) {
+    throw new AppError(500, 'Erro ao criar pagamento Pix da mesa', 'DB_ERROR');
+  }
+
+  gerarQrCodeMP(pagamento.id, primeiroPedidoId, lojaId, valor, expiraEm, idempotencyKey, 'mesa');
+
+  return {
+    pagamento_id: pagamento.id,
+    pix_qrcode: null,
+    pix_copia_cola: null,
+    pix_expira_em: expiraEm.toISOString(),
+    valor,
+  };
+}
+
 export async function generatePixPayment(input: PixPaymentInput): Promise<{
   pagamento_id: string;
   pix_qrcode: string | null;
