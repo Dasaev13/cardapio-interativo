@@ -8,7 +8,7 @@ import {
   listSessions, takeoverSession, releaseSession,
   reprintOrder, getDashboardStats,
 } from '../controllers/admin.controller';
-import { listOrders, updateOrderStatus } from '../controllers/orders.controller';
+import { listOrders, updateOrderStatus, listMesas, fecharMesa } from '../controllers/orders.controller';
 
 const router = Router();
 
@@ -37,6 +37,10 @@ router.put('/categorias/:id', updateCategoria);
 router.get('/pedidos', listOrders);
 router.put('/pedidos/:id/status', updateOrderStatus);
 router.post('/pedidos/:id/print', reprintOrder);
+
+// Mesas (comanda)
+router.get('/mesas', listMesas);
+router.put('/mesas/:mesa/fechar', fecharMesa);
 
 // Bairros de entrega
 router.get('/bairros', listBairros);

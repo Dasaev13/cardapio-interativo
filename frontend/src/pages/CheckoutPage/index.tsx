@@ -43,11 +43,11 @@ export default function CheckoutPage() {
   const total = totalPrice() + taxaEntrega;
 
   async function handleFinalize() {
-    if (!telefoneCliente.trim()) {
+    if (!mesa && !telefoneCliente.trim()) {
       toast.error('Informe seu telefone (WhatsApp)');
       return;
     }
-    if (!formaPagamento) {
+    if (!mesa && !formaPagamento) {
       toast.error('Selecione a forma de pagamento');
       return;
     }
@@ -89,7 +89,7 @@ export default function CheckoutPage() {
           opcoes_selecionadas: item.opcoes_selecionadas,
           observacao: item.observacao,
         })),
-        forma_pagamento: formaPagamento,
+        forma_pagamento: mesa ? 'mesa' : formaPagamento!,
         troco_para: trocoParа ?? undefined,
         observacao: observacao || undefined,
         idempotency_key: idempotencyKey,
@@ -97,11 +97,16 @@ export default function CheckoutPage() {
       });
 
       setPedidoId(pedido.id);
-      submittedRef.current = true; // síncrono — protege o guard antes do clearCart re-render
+      submittedRef.current = true;
       clearCart();
 
-      // Redirecionar para página de pagamento
-      navigate(`/${slug}/payment/${pedido.id}`);
+      if (mesa) {
+        // Pedido de mesa: volta ao cardápio com confirmação
+        toast.success(`Pedido enviado para a cozinha! 🍽️`);
+        navigate(`/${slug}`);
+      } else {
+        navigate(`/${slug}/payment/${pedido.id}`);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao criar pedido. Tente novamente.');
     } finally {
@@ -172,30 +177,32 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {/* Dados do cliente */}
-        <div className="bg-white rounded-2xl p-4 space-y-3">
-          <h2 className="font-semibold text-gray-900">Seus dados</h2>
-          <div>
-            <label className="text-sm text-gray-600 mb-1 block">Nome (opcional)</label>
-            <input
-              type="text"
-              value={nomeCliente}
-              onChange={e => setNomeCliente(e.target.value)}
-              placeholder="Seu nome"
-              className="input-field"
-            />
+        {/* Dados do cliente — oculto para pedidos de mesa */}
+        {!mesa && (
+          <div className="bg-white rounded-2xl p-4 space-y-3">
+            <h2 className="font-semibold text-gray-900">Seus dados</h2>
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">Nome (opcional)</label>
+              <input
+                type="text"
+                value={nomeCliente}
+                onChange={e => setNomeCliente(e.target.value)}
+                placeholder="Seu nome"
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">WhatsApp *</label>
+              <input
+                type="tel"
+                value={telefoneCliente}
+                onChange={e => setTelefoneCliente(e.target.value)}
+                placeholder="(11) 99999-9999"
+                className="input-field"
+              />
+            </div>
           </div>
-          <div>
-            <label className="text-sm text-gray-600 mb-1 block">WhatsApp *</label>
-            <input
-              type="tel"
-              value={telefoneCliente}
-              onChange={e => setTelefoneCliente(e.target.value)}
-              placeholder="(11) 99999-9999"
-              className="input-field"
-            />
-          </div>
-        </div>
+        )}
 
         {/* Endereço de entrega */}
         {!mesa && tipoEntrega === 'delivery' && (
@@ -207,8 +214,8 @@ export default function CheckoutPage() {
           <DeliverySummary result={deliveryResult} />
         )}
 
-        {/* Forma de pagamento */}
-        <PaymentSelector loja={loja} tipoEntrega={tipoEntrega} total={total} />
+        {/* Forma de pagamento — oculto para pedidos de mesa */}
+        {!mesa && <PaymentSelector loja={loja} tipoEntrega={tipoEntrega} total={total} />}
 
         {/* Observação geral */}
         <div className="bg-white rounded-2xl p-4">
@@ -265,7 +272,7 @@ export default function CheckoutPage() {
             disabled={loading}
             className="w-full btn-primary flex items-center justify-between"
           >
-            <span>{loading ? 'Processando...' : 'Confirmar Pedido'}</span>
+            <span>{loading ? 'Enviando...' : mesa ? 'Enviar para a cozinha' : 'Confirmar Pedido'}</span>
             <span className="font-bold">{formatCurrency(total)}</span>
           </button>
         </div>

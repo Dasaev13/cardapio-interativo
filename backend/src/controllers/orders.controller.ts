@@ -64,6 +64,56 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function listMesas(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const lojaId = req.lojaId!;
+
+    const { data: orders, error } = await supabase
+      .from('pedidos')
+      .select('id, numero, status, total, nome_cliente, telefone_cliente, created_at, mesa, pedido_itens(nome_produto, quantidade, preco_unitario)')
+      .eq('loja_id', lojaId)
+      .not('mesa', 'is', null)
+      .not('status', 'in', '(cancelado,entregue)')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Agrupar por mesa
+    const mesasMap: Record<string, { mesa: string; pedidos: any[]; total: number; aberta_desde: string }> = {};
+    for (const order of orders || []) {
+      if (!mesasMap[order.mesa]) {
+        mesasMap[order.mesa] = { mesa: order.mesa, pedidos: [], total: 0, aberta_desde: order.created_at };
+      }
+      mesasMap[order.mesa].pedidos.push(order);
+      mesasMap[order.mesa].total += Number(order.total);
+    }
+
+    const mesas = Object.values(mesasMap).sort((a, b) => Number(a.mesa) - Number(b.mesa));
+    res.json({ data: mesas });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function fecharMesa(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const lojaId = req.lojaId!;
+    const { mesa } = req.params;
+
+    const { error } = await supabase
+      .from('pedidos')
+      .update({ status: 'entregue' })
+      .eq('loja_id', lojaId)
+      .eq('mesa', mesa)
+      .not('status', 'in', '(cancelado,entregue)');
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function updateOrderStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;

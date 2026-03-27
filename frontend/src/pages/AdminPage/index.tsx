@@ -6,7 +6,7 @@ import { apiClient } from '../../api/client';
 import LoginPage from './LoginPage';
 import ProductForm from './ProductForm';
 import OrdersSection from './OrdersSection';
-import MesasQRSection from './MesasQRSection';
+import MesasTab from './MesasTab';
 
 interface Category {
   id: string;
@@ -196,9 +196,9 @@ export default function AdminPage() {
           <OrdersSection lojaId={loja.id} />
         )}
 
-        {/* Seção Mesas / QR Codes */}
-        {activeTab === 'mesas' && (
-          <MesasQRSection lojaSlug={loja?.slug || lojaSlug} />
+        {/* Seção Mesas */}
+        {activeTab === 'mesas' && loja && (
+          <MesasTab lojaId={loja.id} lojaSlug={loja.slug} />
         )}
 
         {/* Seção Cardápio */}

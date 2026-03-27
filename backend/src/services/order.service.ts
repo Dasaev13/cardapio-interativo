@@ -217,8 +217,8 @@ export async function createPedido(input: CreatePedidoInput): Promise<PedidoComp
     tipo_entrega: input.tipo_entrega,
   }).catch(err => console.error('[Order] Erro ao notificar n8n:', err));
 
-  // 11. Se pagamento em dinheiro ou retirada sem pagamento, confirmar diretamente
-  if (input.forma_pagamento === 'dinheiro') {
+  // 11. Se pagamento em dinheiro ou mesa, confirmar e enfileirar impressão
+  if (input.forma_pagamento === 'dinheiro' || input.forma_pagamento === 'mesa') {
     // Enfileirar impressão (assíncrono, não bloqueia resposta)
     printQueue.add('print-order', { pedido_id: pedido.id, loja_id: loja.id })
       .catch(err => console.error('[Order] Erro ao enfileirar impressão:', err.message));

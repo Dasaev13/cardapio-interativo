@@ -29,14 +29,15 @@ export const pedidoItemSchema = z.object({
 export const createPedidoSchema = z.object({
   loja_slug: z.string().min(1, 'Slug da loja é obrigatório'),
   telefone_cliente: z.string()
-    .min(10, 'Telefone inválido')
     .max(20)
-    .transform(v => v.replace(/\D/g, '')),
+    .transform(v => v.replace(/\D/g, ''))
+    .optional()
+    .default(''),
   nome_cliente: z.string().max(100).optional(),
   tipo_entrega: z.enum(['delivery', 'retirada']),
   endereco_entrega: enderecoSchema.optional(),
   itens: z.array(pedidoItemSchema).min(1, 'Pedido deve ter ao menos 1 item'),
-  forma_pagamento: z.enum(['pix', 'cartao', 'dinheiro']),
+  forma_pagamento: z.enum(['pix', 'cartao', 'dinheiro', 'mesa']),
   troco_para: z.number().min(0).optional(),
   observacao: z.string().max(500).optional(),
   idempotency_key: z.string().uuid('Chave de idempotência inválida'),
@@ -46,6 +47,9 @@ export const createPedidoSchema = z.object({
 }).refine(
   (data) => data.tipo_entrega === 'retirada' || data.mesa !== undefined || data.endereco_entrega !== undefined,
   { message: 'Endereço de entrega é obrigatório para delivery', path: ['endereco_entrega'] }
+).refine(
+  (data) => data.mesa !== undefined || data.telefone_cliente.length >= 10,
+  { message: 'Telefone inválido', path: ['telefone_cliente'] }
 ).refine(
   (data) => data.forma_pagamento !== 'dinheiro' || data.troco_para === undefined || data.troco_para >= 0,
   { message: 'Troco inválido', path: ['troco_para'] }

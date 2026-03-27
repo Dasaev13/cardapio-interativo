@@ -31,7 +31,7 @@ export interface CreateOrderPayload {
     }>;
     observacao?: string;
   }>;
-  forma_pagamento: 'pix' | 'cartao' | 'dinheiro';
+  forma_pagamento: 'pix' | 'cartao' | 'dinheiro' | 'mesa';
   troco_para?: number;
   observacao?: string;
   idempotency_key: string;
