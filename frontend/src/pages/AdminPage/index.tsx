@@ -32,7 +32,7 @@ export default function AdminPage() {
 
   const [token, setToken] = useState(() => localStorage.getItem('admin_token') || '');
   const [lojaSlug, setLojaSlug] = useState(() => localStorage.getItem('admin_slug') || slug || '');
-  const [loja, setLoja] = useState<{ id: string; nome: string; aberto: boolean } | null>(null);
+  const [loja, setLoja] = useState<{ id: string; nome: string; slug: string; aberto: boolean } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCat, setSelectedCat] = useState<string>('all');
@@ -198,7 +198,7 @@ export default function AdminPage() {
 
         {/* Seção Mesas / QR Codes */}
         {activeTab === 'mesas' && (
-          <MesasQRSection lojaSlug={lojaSlug} />
+          <MesasQRSection lojaSlug={loja?.slug || lojaSlug} />
         )}
 
         {/* Seção Cardápio */}
