@@ -29,6 +29,7 @@ const envSchema = z.object({
   // Evolution API (WhatsApp)
   EVOLUTION_API_URL: z.string().url().optional(),
   EVOLUTION_API_KEY: z.string().optional(),
+  EVOLUTION_INSTANCE: z.string().default('cardapio'),
 
   // Claude AI
   ANTHROPIC_API_KEY: z.string().optional(),

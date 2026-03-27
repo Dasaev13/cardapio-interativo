@@ -33,8 +33,7 @@ export async function sendWhatsAppMessage(
     },
     body: JSON.stringify({
       number: phone,
-      options: { delay: 1000, presence: 'composing' },
-      textMessage: { text: message },
+      text: message,
     }),
   });
 
@@ -192,4 +191,59 @@ export async function sendN8nEvent(event: string, data: Record<string, any>): Pr
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ event, data, timestamp: new Date().toISOString() }),
   }).catch(err => console.error('[n8n] Erro ao enviar evento:', err));
+}
+
+// Notificar restaurante sobre novo pedido via WhatsApp direto
+export async function notifyNovoPedido(params: {
+  instance: string;
+  telefoneRestaurante: string;
+  telefoneCliente?: string;
+  nomeCliente?: string;
+  numeroPedido: number;
+  total: number;
+  tipoEntrega: string;
+  formaPagamento: string;
+  mesa?: string | null;
+}): Promise<void> {
+  const { instance, telefoneRestaurante, telefoneCliente, nomeCliente, numeroPedido, total, tipoEntrega, formaPagamento, mesa } = params;
+  const tipo = mesa ? `🍽️ Mesa ${mesa}` : (tipoEntrega === 'delivery' ? '🚚 Delivery' : '🏪 Retirada');
+  const pgto = ({ pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão', mesa: 'Conta da Mesa' } as Record<string, string>)[formaPagamento] || formaPagamento;
+  const cliente = nomeCliente || (telefoneCliente ? `+${telefoneCliente}` : mesa ? `Mesa ${mesa}` : 'Cliente');
+  const totalFmt = Number(total).toFixed(2).replace('.', ',');
+
+  const msgRestaurante = `🔔 *NOVO PEDIDO #${numeroPedido}*\n\n${tipo}\n💰 R$ ${totalFmt}\n💳 ${pgto}\n👤 ${cliente}`;
+
+  await sendWhatsAppMessage(instance, telefoneRestaurante, msgRestaurante)
+    .catch(err => console.error('[WA] Erro ao notificar restaurante:', err));
+
+  if (telefoneCliente) {
+    const primeiroNome = nomeCliente?.split(' ')[0] || '';
+    const msgCliente = `✅ *Pedido recebido!*\n\nOlá${primeiroNome ? ' ' + primeiroNome : ''}! Seu pedido *#${numeroPedido}* foi recebido! 😊\n\nEstamos preparando tudo para você.`;
+    await sendWhatsAppMessage(instance, telefoneCliente, msgCliente)
+      .catch(err => console.error('[WA] Erro ao notificar cliente:', err));
+  }
+}
+
+// Notificar cliente sobre mudança de status do pedido
+export async function notifyStatusPedido(params: {
+  instance: string;
+  telefoneCliente: string;
+  numeroPedido: number;
+  status: string;
+  tipoEntrega: string;
+  mesa?: string | null;
+}): Promise<void> {
+  const { instance, telefoneCliente, numeroPedido, status, tipoEntrega, mesa } = params;
+  const msgs: Record<string, string> = {
+    confirmado: `✅ *Pedido #${numeroPedido} confirmado!*\nJá estamos preparando. 👨‍🍳`,
+    preparando: `👨‍🍳 *Pedido #${numeroPedido} em preparo!*\nAguarde mais um pouquinho.`,
+    pronto: `🔔 *Pedido #${numeroPedido} pronto!*\n${tipoEntrega === 'delivery' ? 'O entregador está a caminho! 🚚' : mesa ? 'Será entregue na sua mesa! 🍽️' : 'Pode vir retirar! 🏪'}`,
+    entregue: `✅ *Pedido #${numeroPedido} entregue!*\nObrigado pela preferência! 😊`,
+    cancelado: `❌ *Pedido #${numeroPedido} cancelado.*\nEntre em contato se precisar de ajuda.`,
+  };
+  const msg = msgs[status];
+  if (!msg) return;
+
+  await sendWhatsAppMessage(instance, telefoneCliente, msg)
+    .catch(err => console.error('[WA] Erro ao notificar status:', err));
 }

@@ -3,7 +3,8 @@ import { AppError } from '../middleware/errorHandler';
 import { CreatePedidoInput } from '../validators/order.validator';
 import { calculateDeliveryFee } from './delivery.service';
 import { notificationQueue, printQueue } from '../config/queues';
-import { sendN8nEvent } from './whatsapp.service';
+import { sendN8nEvent, notifyNovoPedido, notifyStatusPedido } from './whatsapp.service';
+import { env } from '../config/env';
 
 export interface PedidoCompleto {
   id: string;
@@ -52,7 +53,7 @@ export async function createPedido(input: CreatePedidoInput): Promise<PedidoComp
   // 2. Buscar loja
   const { data: loja, error: lojaError } = await supabase
     .from('lojas')
-    .select('id, config, ativo, aberto')
+    .select('id, config, ativo, aberto, telefone')
     .eq('slug', input.loja_slug)
     .single();
 
@@ -207,15 +208,20 @@ export async function createPedido(input: CreatePedidoInput): Promise<PedidoComp
     throw new AppError(500, 'Erro ao criar itens do pedido', 'DB_ERROR');
   }
 
-  // 10. Notificar n8n sobre novo pedido (assíncrono, não bloqueia resposta)
-  sendN8nEvent('order_created', {
-    pedido_id: pedido.id,
-    loja_id: loja.id,
-    telefone_cliente: input.telefone_cliente,
-    forma_pagamento: input.forma_pagamento,
-    total,
-    tipo_entrega: input.tipo_entrega,
-  }).catch(err => console.error('[Order] Erro ao notificar n8n:', err));
+  // 10. Notificar via WhatsApp (assíncrono, não bloqueia resposta)
+  if (loja.telefone && env.EVOLUTION_API_URL) {
+    notifyNovoPedido({
+      instance: loja.config?.whatsapp_instance || env.EVOLUTION_INSTANCE,
+      telefoneRestaurante: loja.telefone,
+      telefoneCliente: input.telefone_cliente || undefined,
+      nomeCliente: input.nome_cliente,
+      numeroPedido: pedido.numero,
+      total,
+      tipoEntrega: input.tipo_entrega,
+      formaPagamento: input.forma_pagamento,
+      mesa: input.mesa,
+    }).catch(err => console.error('[Order] Erro ao notificar WhatsApp:', err));
+  }
 
   // 11. Se pagamento em dinheiro ou mesa, confirmar e enfileirar impressão
   if (input.forma_pagamento === 'dinheiro' || input.forma_pagamento === 'mesa') {
@@ -266,6 +272,25 @@ export async function updatePedidoStatus(
     throw new AppError(500, 'Erro ao atualizar status', 'DB_ERROR');
   }
 
-  // Notificar n8n sobre mudança de status
-  sendN8nEvent('order_status_changed', { pedido_id: pedidoId, status }).catch(() => {});
+  // Notificar cliente sobre mudança de status via WhatsApp
+  if (env.EVOLUTION_API_URL) {
+    supabase
+      .from('pedidos')
+      .select('numero, telefone_cliente, tipo_entrega, mesa, lojas(telefone, config)')
+      .eq('id', pedidoId)
+      .single()
+      .then(({ data: p }) => {
+        if (!p?.telefone_cliente) return;
+        const lojaData = (p as any).lojas;
+        notifyStatusPedido({
+          instance: lojaData?.config?.whatsapp_instance || env.EVOLUTION_INSTANCE,
+          telefoneCliente: p.telefone_cliente,
+          numeroPedido: p.numero,
+          status,
+          tipoEntrega: p.tipo_entrega,
+          mesa: p.mesa,
+        }).catch(() => {});
+      })
+      .catch(() => {});
+  }
 }
