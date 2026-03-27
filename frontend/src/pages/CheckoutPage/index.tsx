@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Truck, Store } from 'lucide-react';
+import { ArrowLeft, Truck, Store, UtensilsCrossed } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
 import { useOrderStore } from '../../store/orderStore';
 import { useMenu } from '../../hooks/useMenu';
@@ -15,7 +15,7 @@ export default function CheckoutPage() {
   const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { data: menu } = useMenu(slug);
-  const { items, totalPrice, clearCart, isEmpty } = useCartStore();
+  const { items, totalPrice, clearCart, isEmpty, mesa } = useCartStore();
   const {
     tipoEntrega, setTipoEntrega,
     endereco, deliveryResult,
@@ -51,12 +51,12 @@ export default function CheckoutPage() {
       toast.error('Selecione a forma de pagamento');
       return;
     }
-    if (tipoEntrega === 'delivery' && !endereco) {
+    if (!mesa && tipoEntrega === 'delivery' && !endereco) {
       toast.error('Informe o endereço de entrega');
       setStep('delivery');
       return;
     }
-    if (tipoEntrega === 'delivery' && !deliveryResult?.disponivel) {
+    if (!mesa && tipoEntrega === 'delivery' && !deliveryResult?.disponivel) {
       toast.error('Endereço fora da área de entrega');
       return;
     }
@@ -69,8 +69,9 @@ export default function CheckoutPage() {
         loja_slug: slug,
         telefone_cliente: telefoneCliente,
         nome_cliente: nomeCliente || undefined,
-        tipo_entrega: tipoEntrega,
-        endereco_entrega: tipoEntrega === 'delivery' && endereco ? {
+        tipo_entrega: mesa ? 'retirada' : tipoEntrega,
+        mesa: mesa || undefined,
+        endereco_entrega: !mesa && tipoEntrega === 'delivery' && endereco ? {
           rua: endereco.rua,
           numero: endereco.numero,
           complemento: endereco.complemento,
@@ -124,42 +125,52 @@ export default function CheckoutPage() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-32">
-        {/* Tipo de entrega */}
-        <div className="bg-white rounded-2xl p-4">
-          <h2 className="font-semibold text-gray-900 mb-3">Como deseja receber?</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {loja.config.aceitar_entrega && (
-              <button
-                onClick={() => setTipoEntrega('delivery')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                  tipoEntrega === 'delivery'
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-gray-200 bg-gray-50'
-                }`}
-              >
-                <Truck size={24} className={tipoEntrega === 'delivery' ? 'text-red-500' : 'text-gray-400'} />
-                <span className={`text-sm font-semibold ${tipoEntrega === 'delivery' ? 'text-red-500' : 'text-gray-600'}`}>
-                  Entrega
-                </span>
-              </button>
-            )}
-            {loja.config.aceitar_retirada && (
-              <button
-                onClick={() => setTipoEntrega('retirada')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                  tipoEntrega === 'retirada'
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-gray-200 bg-gray-50'
-                }`}
-              >
-                <Store size={24} className={tipoEntrega === 'retirada' ? 'text-red-500' : 'text-gray-400'} />
-                <span className={`text-sm font-semibold ${tipoEntrega === 'retirada' ? 'text-red-500' : 'text-gray-600'}`}>
-                  Retirada
-                </span>
-              </button>
-            )}
+        {/* Tipo de entrega / Mesa */}
+        {mesa ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+            <UtensilsCrossed size={24} className="text-amber-600 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-amber-900">Mesa {mesa}</p>
+              <p className="text-sm text-amber-700">O pedido será entregue na sua mesa</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-2xl p-4">
+            <h2 className="font-semibold text-gray-900 mb-3">Como deseja receber?</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {loja.config.aceitar_entrega && (
+                <button
+                  onClick={() => setTipoEntrega('delivery')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    tipoEntrega === 'delivery'
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-200 bg-gray-50'
+                  }`}
+                >
+                  <Truck size={24} className={tipoEntrega === 'delivery' ? 'text-red-500' : 'text-gray-400'} />
+                  <span className={`text-sm font-semibold ${tipoEntrega === 'delivery' ? 'text-red-500' : 'text-gray-600'}`}>
+                    Entrega
+                  </span>
+                </button>
+              )}
+              {loja.config.aceitar_retirada && (
+                <button
+                  onClick={() => setTipoEntrega('retirada')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    tipoEntrega === 'retirada'
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-200 bg-gray-50'
+                  }`}
+                >
+                  <Store size={24} className={tipoEntrega === 'retirada' ? 'text-red-500' : 'text-gray-400'} />
+                  <span className={`text-sm font-semibold ${tipoEntrega === 'retirada' ? 'text-red-500' : 'text-gray-600'}`}>
+                    Retirada
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Dados do cliente */}
         <div className="bg-white rounded-2xl p-4 space-y-3">
@@ -187,12 +198,12 @@ export default function CheckoutPage() {
         </div>
 
         {/* Endereço de entrega */}
-        {tipoEntrega === 'delivery' && (
+        {!mesa && tipoEntrega === 'delivery' && (
           <DeliveryForm slug={slug} />
         )}
 
         {/* Resumo da taxa de entrega */}
-        {tipoEntrega === 'delivery' && deliveryResult && (
+        {!mesa && tipoEntrega === 'delivery' && deliveryResult && (
           <DeliverySummary result={deliveryResult} />
         )}
 
@@ -229,7 +240,7 @@ export default function CheckoutPage() {
                 <span className="text-gray-600">Subtotal</span>
                 <span>{formatCurrency(totalPrice())}</span>
               </div>
-              {tipoEntrega === 'delivery' && (
+              {!mesa && tipoEntrega === 'delivery' && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Entrega</span>
                   <span className={taxaEntrega === 0 ? 'text-green-600 font-medium' : ''}>

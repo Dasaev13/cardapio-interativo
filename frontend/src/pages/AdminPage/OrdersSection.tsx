@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../../api/client';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/format';
-import { RefreshCw, ChevronDown, ChevronUp, Truck, Store, Clock } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronUp, Truck, Store, Clock, UtensilsCrossed } from 'lucide-react';
 
 interface Order {
   id: string;
@@ -13,6 +13,7 @@ interface Order {
   nome_cliente: string | null;
   telefone_cliente: string;
   forma_pagamento: string;
+  mesa: string | null;
   impresso: boolean;
   created_at: string;
 }
@@ -196,16 +197,22 @@ export default function OrdersSection({ lojaId }: { lojaId: string }) {
                         <div className="font-medium text-gray-900">
                           {order.nome_cliente || order.telefone_cliente}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[order.status]}`}>
                             {STATUS_LABEL[order.status]}
                           </span>
-                          <span className="text-xs text-gray-400 flex items-center gap-1">
-                            {order.tipo_entrega === 'delivery'
-                              ? <><Truck size={10} /> Entrega</>
-                              : <><Store size={10} /> Retirada</>
-                            }
-                          </span>
+                          {order.mesa ? (
+                            <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <UtensilsCrossed size={10} /> Mesa {order.mesa}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              {order.tipo_entrega === 'delivery'
+                                ? <><Truck size={10} /> Entrega</>
+                                : <><Store size={10} /> Retirada</>
+                              }
+                            </span>
+                          )}
                           <span className="text-xs text-gray-400">{PAGAMENTO_LABEL[order.forma_pagamento] || order.forma_pagamento}</span>
                         </div>
                       </div>

@@ -6,6 +6,7 @@ export interface CreateOrderPayload {
   telefone_cliente: string;
   nome_cliente?: string;
   tipo_entrega: 'delivery' | 'retirada';
+  mesa?: string;
   endereco_entrega?: {
     rua: string;
     numero: string;

@@ -35,7 +35,7 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
 
     let query = supabase
       .from('pedidos')
-      .select('id, numero, status, total, tipo_entrega, nome_cliente, telefone_cliente, forma_pagamento, impresso, created_at', { count: 'exact' })
+      .select('id, numero, status, total, tipo_entrega, nome_cliente, telefone_cliente, forma_pagamento, mesa, impresso, created_at', { count: 'exact' })
       .eq('loja_id', lojaId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMenu } from '../../hooks/useMenu';
 import { useCartStore } from '../../store/cartStore';
 import CategoryNav from './CategoryNav';
@@ -8,14 +8,15 @@ import ProductModal from './ProductModal';
 import CartDrawer from './CartDrawer';
 import BottomCartBar from '../../components/layout/BottomCartBar';
 import LojaHeader from '../../components/layout/LojaHeader';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, UtensilsCrossed } from 'lucide-react';
 import type { Produto } from '../../types/menu';
 
 export default function MenuPage() {
   const { slug = '' } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data: menu, isLoading, error } = useMenu(slug);
-  const { setLojaSlug, totalItems } = useCartStore();
+  const { setLojaSlug, setMesa, mesa, totalItems } = useCartStore();
 
   const [selectedProduct, setSelectedProduct] = useState<Produto | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -25,6 +26,11 @@ export default function MenuPage() {
   useEffect(() => {
     if (slug) setLojaSlug(slug);
   }, [slug, setLojaSlug]);
+
+  useEffect(() => {
+    const mesaParam = searchParams.get('mesa');
+    if (mesaParam) setMesa(mesaParam);
+  }, [searchParams, setMesa]);
 
   useEffect(() => {
     if (menu?.categorias?.length) {
@@ -71,6 +77,16 @@ export default function MenuPage() {
     <div className="min-h-screen bg-gray-50 pb-32">
       {/* Header da loja */}
       <LojaHeader loja={loja} />
+
+      {/* Banner de mesa */}
+      {mesa && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-2">
+          <UtensilsCrossed size={16} className="text-amber-600 flex-shrink-0" />
+          <span className="text-amber-800 text-sm font-medium">
+            Você está na <strong>Mesa {mesa}</strong> — seu pedido será entregue aqui
+          </span>
+        </div>
+      )}
 
       {/* Navegação por categorias */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-100">

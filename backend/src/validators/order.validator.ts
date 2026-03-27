@@ -42,8 +42,9 @@ export const createPedidoSchema = z.object({
   idempotency_key: z.string().uuid('Chave de idempotência inválida'),
   session_id: z.string().uuid().optional(),
   origem: z.enum(['whatsapp', 'web', 'admin']).default('web'),
+  mesa: z.string().max(20).optional(),
 }).refine(
-  (data) => data.tipo_entrega === 'retirada' || data.endereco_entrega !== undefined,
+  (data) => data.tipo_entrega === 'retirada' || data.mesa !== undefined || data.endereco_entrega !== undefined,
   { message: 'Endereço de entrega é obrigatório para delivery', path: ['endereco_entrega'] }
 ).refine(
   (data) => data.forma_pagamento !== 'dinheiro' || data.troco_para === undefined || data.troco_para >= 0,

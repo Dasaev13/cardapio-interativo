@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, LogOut, ExternalLink, ChefHat, ClipboardList } from 'lucide-react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, LogOut, ExternalLink, ChefHat, ClipboardList, QrCode } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { apiClient } from '../../api/client';
 import LoginPage from './LoginPage';
 import ProductForm from './ProductForm';
 import OrdersSection from './OrdersSection';
+import MesasQRSection from './MesasQRSection';
 
 interface Category {
   id: string;
@@ -38,7 +39,7 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'cardapio'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'cardapio' | 'mesas'>('pedidos');
 
   const isLogged = !!token;
 
@@ -179,11 +180,25 @@ export default function AdminPage() {
             <ChefHat size={16} />
             Cardápio
           </button>
+          <button
+            onClick={() => setActiveTab('mesas')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'mesas' ? 'bg-white shadow text-green-800' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <QrCode size={16} />
+            Mesas
+          </button>
         </div>
 
         {/* Seção Pedidos */}
         {activeTab === 'pedidos' && loja && (
           <OrdersSection lojaId={loja.id} />
+        )}
+
+        {/* Seção Mesas / QR Codes */}
+        {activeTab === 'mesas' && (
+          <MesasQRSection lojaSlug={lojaSlug} />
         )}
 
         {/* Seção Cardápio */}

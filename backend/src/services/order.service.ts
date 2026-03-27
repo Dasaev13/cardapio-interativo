@@ -175,8 +175,9 @@ export async function createPedido(input: CreatePedidoInput): Promise<PedidoComp
       origem: input.origem,
       idempotency_key: input.idempotency_key,
       session_id: input.session_id || null,
+      mesa: input.mesa || null,
     })
-    .select('id, numero, loja_id, status, total, taxa_entrega, subtotal, tipo_entrega, telefone_cliente, nome_cliente, forma_pagamento, created_at')
+    .select('id, numero, loja_id, status, total, taxa_entrega, subtotal, tipo_entrega, telefone_cliente, nome_cliente, forma_pagamento, mesa, created_at')
     .single();
 
   if (pedidoError || !pedido) {

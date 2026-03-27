@@ -5,6 +5,7 @@ import type { CartItem, OpcaoSelecionada } from '../types/order';
 interface CartStore {
   items: CartItem[];
   lojaSlug: string | null;
+  mesa: string | null;
 
   // Ações
   addItem: (item: Omit<CartItem, 'subtotal'>) => void;
@@ -12,6 +13,7 @@ interface CartStore {
   updateQuantity: (produto_id: string, opcoes: OpcaoSelecionada[], quantidade: number) => void;
   clearCart: () => void;
   setLojaSlug: (slug: string) => void;
+  setMesa: (mesa: string | null) => void;
 
   // Computed
   totalItems: () => number;
@@ -33,6 +35,9 @@ export const useCartStore = create<CartStore>()(
     (set, get) => ({
       items: [],
       lojaSlug: null,
+      mesa: null,
+
+      setMesa: (mesa) => set({ mesa }),
 
       setLojaSlug: (slug) => {
         const { lojaSlug } = get();
