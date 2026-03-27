@@ -274,23 +274,23 @@ export async function updatePedidoStatus(
 
   // Notificar cliente sobre mudança de status via WhatsApp
   if (env.EVOLUTION_API_URL) {
-    supabase
-      .from('pedidos')
-      .select('numero, telefone_cliente, tipo_entrega, mesa, lojas(telefone, config)')
-      .eq('id', pedidoId)
-      .single()
-      .then(({ data: p }) => {
-        if (!p?.telefone_cliente) return;
-        const lojaData = (p as any).lojas;
-        notifyStatusPedido({
-          instance: lojaData?.config?.whatsapp_instance || env.EVOLUTION_INSTANCE,
-          telefoneCliente: p.telefone_cliente,
-          numeroPedido: p.numero,
-          status,
-          tipoEntrega: p.tipo_entrega,
-          mesa: p.mesa,
-        }).catch(() => {});
-      })
-      .catch(() => {});
+    Promise.resolve(
+      supabase
+        .from('pedidos')
+        .select('numero, telefone_cliente, tipo_entrega, mesa, lojas(telefone, config)')
+        .eq('id', pedidoId)
+        .single()
+    ).then(({ data: p }) => {
+      if (!p?.telefone_cliente) return;
+      const lojaData = (p as any).lojas;
+      notifyStatusPedido({
+        instance: lojaData?.config?.whatsapp_instance || env.EVOLUTION_INSTANCE,
+        telefoneCliente: p.telefone_cliente,
+        numeroPedido: p.numero,
+        status,
+        tipoEntrega: p.tipo_entrega,
+        mesa: p.mesa,
+      }).catch(() => {});
+    }).catch(() => {});
   }
 }
