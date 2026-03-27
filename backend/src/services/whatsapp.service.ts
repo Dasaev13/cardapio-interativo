@@ -157,8 +157,19 @@ export async function processWhatsAppMessage(payload: {
     return;
   }
 
-  // Menu principal
-  if (['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite', 'oi!', 'menu', '1', 'cardapio', 'cardápio'].some(kw => msg.includes(kw)) || session.estado === 'idle') {
+  // Opção 1: enviar link direto do cardápio
+  if (msg === '1' || msg.includes('cardapio') || msg.includes('cardápio')) {
+    const menuUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/${loja.slug}`;
+    await sendWhatsAppMessage(instance, phone,
+      `🍔 *Acesse nosso cardápio:*\n${menuUrl}\n\n` +
+      (loja.aberto ? '🟢 *Estamos abertos!* Faça seu pedido pelo link acima.' : '🔴 *Estamos fechados no momento.*')
+    );
+    await updateSessionEstado(lojaId, phone, 'menu_sent', session.dados);
+    return;
+  }
+
+  // Menu principal (saudações e estado idle)
+  if (['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite', 'oi!', 'menu'].some(kw => msg.includes(kw)) || session.estado === 'idle') {
     const menuUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/${loja.slug}`;
 
     const welcomeMsg = `Olá! 👋 Bem-vindo ao *${loja.nome}*!\n\n` +
