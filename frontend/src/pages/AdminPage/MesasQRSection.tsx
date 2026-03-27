@@ -10,7 +10,7 @@ export default function MesasQRSection({ lojaSlug }: MesasQRSectionProps) {
   const [quantidade, setQuantidade] = useState(10);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const baseUrl = window.location.origin;
+  const baseUrl = import.meta.env.VITE_PUBLIC_URL || window.location.origin;
   const mesas = Array.from({ length: quantidade }, (_, i) => i + 1);
 
   function handlePrint() {
