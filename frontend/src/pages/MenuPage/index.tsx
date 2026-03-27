@@ -29,7 +29,7 @@ export default function MenuPage() {
 
   useEffect(() => {
     const mesaParam = searchParams.get('mesa');
-    if (mesaParam) setMesa(mesaParam);
+    setMesa(mesaParam);
   }, [searchParams, setMesa]);
 
   useEffect(() => {
